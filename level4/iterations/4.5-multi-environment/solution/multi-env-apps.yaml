@@ -1,0 +1,122 @@
+# Development Environment Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: temple-stack-dev
+  namespace: argocd
+  labels:
+    environment: development
+    team: platform
+spec:
+  project: temple-dev
+  
+  source:
+    repoURL: https://github.com/your-org/gitops-temple-stack.git
+    targetRevision: HEAD  # Track main branch
+    path: charts/temple-stack
+    helm:
+      releaseName: temple-dev
+      valueFiles:
+      - values.yaml
+      - values-dev.yaml
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: temple-dev
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+
+---
+# Staging Environment Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: temple-stack-staging
+  namespace: argocd
+  labels:
+    environment: staging
+    team: platform
+spec:
+  project: temple-staging
+  
+  source:
+    repoURL: https://github.com/your-org/gitops-temple-stack.git
+    targetRevision: release-candidate  # Track RC branch
+    path: charts/temple-stack
+    helm:
+      releaseName: temple-staging
+      valueFiles:
+      - values.yaml
+      - values-staging.yaml
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: temple-staging
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false  # Manual approval for staging
+    syncOptions:
+    - CreateNamespace=true
+
+---
+# Production Environment Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: temple-stack-prod
+  namespace: argocd
+  labels:
+    environment: production
+    team: platform
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: prod-deployments
+spec:
+  project: temple-prod
+  
+  source:
+    repoURL: https://github.com/your-org/gitops-temple-stack.git
+    targetRevision: v1.0.0  # Use tagged releases only
+    path: charts/temple-stack
+    helm:
+      releaseName: temple-prod
+      valueFiles:
+      - values.yaml
+      - values-prod.yaml
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: temple-prod
+  
+  syncPolicy:
+    automated: null  # Manual sync only for production
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        maxDuration: 3m
+
+---
+# Deployment Workflow:
+# 1. Create projects first:
+#    kubectl apply -f argocd-projects.yaml
+#
+# 2. Deploy applications:
+#    kubectl apply -f multi-env-apps.yaml
+#
+# 3. Promotion workflow:
+#    Dev (auto) → merge to RC → Staging (auto) → tag release → Prod (manual)
+#
+# 4. Monitor all environments:
+#    argocd app list
+#    argocd app get temple-stack-dev
+#    argocd app get temple-stack-staging
+#    argocd app get temple-stack-prod

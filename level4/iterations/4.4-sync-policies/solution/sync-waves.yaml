@@ -1,0 +1,180 @@
+# Sync Waves Example - Ordered Deployment
+# Resources deploy in order of wave number: -5, 0, 1, 2, 3...
+# Resources in same wave deploy in parallel
+
+---
+# Wave -5: Critical infrastructure
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: temple-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+
+---
+# Wave 0: Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: temple-config
+  namespace: temple-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  environment: production
+
+---
+# Wave 0: Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: temple-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+type: Opaque
+stringData:
+  username: temple_user
+  password: temple_password
+  database: temple_db
+
+---
+# Wave 1: Database PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: temple-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Wave 2: Database StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: temple-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - secretRef:
+            name: postgres-secret
+
+---
+# Wave 2: Database Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: temple-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+
+---
+# Wave 3: API Deployment (waits for DB)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temple-api
+  namespace: temple-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: temple-api
+  template:
+    metadata:
+      labels:
+        app: temple-api
+    spec:
+      containers:
+      - name: api
+        image: temple-api:latest
+        ports:
+        - containerPort: 1337
+
+---
+# Wave 4: UI Deployment (waits for API)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temple-ui
+  namespace: temple-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: temple-ui
+  template:
+    metadata:
+      labels:
+        app: temple-ui
+    spec:
+      containers:
+      - name: ui
+        image: temple-ui:latest
+        ports:
+        - containerPort: 80
+
+---
+# Wave 5: Ingress (last)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: temple-ingress
+  namespace: temple-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  rules:
+  - host: temple.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: temple-ui-service
+            port:
+              number: 80
+
+# Deployment order:
+# 1. Namespace (-5)
+# 2. ConfigMap, Secret (0)
+# 3. PVC (1)
+# 4. Database StatefulSet + Service (2)
+# 5. API Deployment (3) - waits for DB to be ready
+# 6. UI Deployment (4) - waits for API
+# 7. Ingress (5) - waits for everything

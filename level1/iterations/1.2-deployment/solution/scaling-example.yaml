@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scalable-app
+  namespace: level1
+  labels:
+    app: scalable
+spec:
+  # Start with 2 replicas
+  replicas: 2
+  selector:
+    matchLabels:
+      app: scalable
+  
+  # Rolling update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Never have more than 1 extra pod during update
+      maxSurge: 1
+      # Never have less than desired during update (zero downtime)
+      maxUnavailable: 0
+  
+  template:
+    metadata:
+      labels:
+        app: scalable
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+        
+        # Resource limits for predictable scaling
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "250m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+
+---
+# To practice scaling, try these commands:
+
+# Scale up
+# kubectl scale deployment scalable-app --replicas=5
+
+# Scale down
+# kubectl scale deployment scalable-app --replicas=1
+
+# Watch the scaling happen
+# kubectl get pods -w -l app=scalable
+
+# Autoscale (requires metrics server)
+# kubectl autoscale deployment scalable-app --min=2 --max=10 --cpu-percent=80

@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: temple-stack-automated
+  namespace: argocd
+  labels:
+    environment: production
+    automation: full
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/your-org/gitops-temple-stack.git
+    targetRevision: v1.0.0
+    path: charts/temple-stack
+    helm:
+      valueFiles:
+      - values-prod.yaml
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: temple-prod
+  
+  # Full automation with sync policies
+  syncPolicy:
+    # Automated sync
+    automated:
+      prune: true        # Delete resources not in Git
+      selfHeal: true     # Auto-correct drift
+      allowEmpty: false  # Prevent deleting all resources
+    
+    # Sync options
+    syncOptions:
+    - CreateNamespace=true
+    - PruneLast=true
+    - PrunePropagationPolicy=foreground
+    - ApplyOutOfSyncOnly=true
+    - ServerSideApply=true
+    
+    # Retry on failure
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 5m
+  
+  # Ignore specific fields that change frequently
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    jsonPointers:
+    - /spec/replicas  # If using HPA
+  - group: apps
+    kind: StatefulSet
+    jsonPointers:
+    - /spec/volumeClaimTemplates/0/spec/storageClassName
+
+---
+# Test self-healing:
+# 1. Deploy: kubectl apply -f automated-sync-app.yaml
+# 2. Make manual change: kubectl scale deployment temple-api --replicas=10 -n temple-prod
+# 3. Watch ArgoCD auto-correct: argocd app get temple-stack-automated --refresh

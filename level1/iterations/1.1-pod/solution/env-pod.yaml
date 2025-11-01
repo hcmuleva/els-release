@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: env-pod
+  labels:
+    app: env-demo
+spec:
+  containers:
+  - name: alpine
+    image: alpine:3.14
+    command: ['sh', '-c', 'echo "Hello $NAME from $LOCATION!" && echo "All environment variables:" && env && sleep 3600']
+    env:
+    - name: NAME
+      value: "Student"
+    - name: LOCATION
+      value: "Kubernetes Level 1"
+    - name: ITERATION
+      value: "1.1"

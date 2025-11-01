@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: level2
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+    protocol: TCP
+
+---
+# ClusterIP service for internal database access only
+# Other services in the cluster can connect to: postgres-service:5432
+
+# DNS names available:
+# - postgres-service (within level2 namespace)
+# - postgres-service.level2 (from other namespaces)
+# - postgres-service.level2.svc.cluster.local (FQDN)
+
+# Check service:
+# kubectl get svc postgres-service -n level2
+
+# Check endpoints:
+# kubectl get endpoints postgres-service -n level2
+# Should show postgres-0 pod IP
+
+# Test connectivity from another pod:
+# kubectl run psql-test --image=postgres:14-alpine --rm -it -n level2 -- sh
+# psql -h postgres-service -U templeadmin -d templedb

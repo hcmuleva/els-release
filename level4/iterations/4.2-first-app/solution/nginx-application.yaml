@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-app
+  namespace: argocd
+  labels:
+    app: nginx
+    environment: development
+spec:
+  # Project (for RBAC and resource isolation)
+  project: default
+  
+  # Source repository
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps.git
+    targetRevision: HEAD
+    path: guestbook
+  
+  # Destination cluster and namespace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  
+  # Sync policy
+  syncPolicy:
+    # Manual sync (no automated)
+    automated: null
+    
+    # Sync options
+    syncOptions:
+    - CreateNamespace=true  # Auto-create namespace if missing
+    - PruneLast=true        # Delete resources last during sync
+    
+    # Retry strategy
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Create this application:
+# kubectl apply -f nginx-application.yaml
+
+# Or via CLI:
+# argocd app create nginx-app \
+#   --repo https://github.com/argoproj/argocd-example-apps.git \
+#   --path guestbook \
+#   --dest-server https://kubernetes.default.svc \
+#   --dest-namespace default
+
+# Sync application:
+# argocd app sync nginx-app
+
+# Check status:
+# argocd app get nginx-app
+
+# View in UI:
+# https://localhost:8080/applications/nginx-app

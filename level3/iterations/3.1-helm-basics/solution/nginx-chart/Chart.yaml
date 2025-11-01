@@ -1,0 +1,18 @@
+apiVersion: v2
+name: nginx-chart
+description: Simple nginx web server Helm chart
+type: application
+version: 0.1.0        # Chart version (increment when chart changes)
+appVersion: "1.21"    # Application version (nginx version)
+
+# Optional metadata
+keywords:
+  - nginx
+  - web
+  - server
+home: https://nginx.org
+sources:
+  - https://github.com/nginx/nginx
+maintainers:
+  - name: Your Name
+    email: your.email@example.com
