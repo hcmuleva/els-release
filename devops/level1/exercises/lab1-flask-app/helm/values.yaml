@@ -15,7 +15,7 @@ ingress:
   className: nginx
   annotations: {}
   hosts:
-    - host: flask-lab12.local
+    - host: flask-lab1.local
       paths:
         - path: /
           pathType: Prefix
