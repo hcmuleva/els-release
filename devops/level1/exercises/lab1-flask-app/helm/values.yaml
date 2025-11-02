@@ -2,8 +2,7 @@ replicaCount: 1
 
 image:
   repository: harishdell/flask-lab1
-  tag: "1.1"
-  test: "test"
+  tag: "2.0"
   pullPolicy: IfNotPresent
 
 service:
@@ -16,7 +15,7 @@ ingress:
   className: nginx
   annotations: {}
   hosts:
-    - host: flask-lab1.local
+    - host: flask-lab1_2.local
       paths:
         - path: /
           pathType: Prefix

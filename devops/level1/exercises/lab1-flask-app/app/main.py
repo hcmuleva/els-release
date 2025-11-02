@@ -5,7 +5,7 @@ app = Flask(__name__)
 # Root endpoint (GET)
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({"message": "Welcome to Flask Lab1!"})
+    return jsonify({"message": "Welcome to Flask Lab2 with V2 demo!"})
 
 # POST endpoint
 @app.route("/echo", methods=["POST"])
