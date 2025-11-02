@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: flask-lab1
+  repository: harishdell/flask-lab1
   tag: latest
   pullPolicy: IfNotPresent
 
