@@ -17,6 +17,6 @@ ingress:
   hosts:
     - host: flask-lab1.local
       paths:
-        - path: /
+        - path: /qa
           pathType: Prefix
   tls: []
