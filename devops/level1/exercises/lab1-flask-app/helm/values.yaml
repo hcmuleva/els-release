@@ -3,6 +3,7 @@ replicaCount: 1
 image:
   repository: harishdell/flask-lab1
   tag: "1.1"
+  test: "test"
   pullPolicy: IfNotPresent
 
 service:
