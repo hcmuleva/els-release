@@ -64,7 +64,7 @@ temple-api:
     imagePullPolicy: IfNotPresent
     containerPort: 1337
     servicePort: 1337
-    replicaCount: 4
+    replicaCount: 1
 
     env:
       HOST: "0.0.0.0"
