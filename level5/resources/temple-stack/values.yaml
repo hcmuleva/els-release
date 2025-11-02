@@ -91,7 +91,7 @@ temple-api:
 temple-ui:
   enabled: true
   
-  replicaCount: 1
+  replicaCount: 3
   imagePullPolicy: IfNotPresent  # Docker Desktop can access local images
   
   templeui:

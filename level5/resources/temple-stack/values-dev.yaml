@@ -1,5 +1,5 @@
 global:
-  imagePullPolicy: Never
+  imagePullPolicy: IfNotPresent
   domain: temple.local
 
 postgres:
@@ -21,7 +21,7 @@ temple-api:
 
 temple-ui:
   replicaCount: 1
-  imagePullPolicy: Never
+  imagePullPolicy: IfNotPresent
   
   templeui:
     tag: "1.1"

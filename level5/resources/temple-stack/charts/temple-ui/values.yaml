@@ -2,7 +2,7 @@
 # Common configuration
 # ===========================================
 replicaCount: 1
-imagePullPolicy: Never
+imagePullPolicy: IfNotPresent
 
 # ===========================================
 # React App configuration
