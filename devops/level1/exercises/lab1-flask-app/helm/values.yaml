@@ -1,0 +1,22 @@
+replicaCount: 1
+
+image:
+  repository: flask-lab1
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 5000
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: flask-lab1.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
