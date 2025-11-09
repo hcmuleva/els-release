@@ -1,0 +1,2 @@
+# This lesson is organized folder. We have moved course test cases into course folder and corrosponding changes in Runner.java.
+# We also created a new test cases for exam and its also test with dynamic data. working fine
