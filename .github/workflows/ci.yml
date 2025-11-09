@@ -156,7 +156,18 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/els-lmsclient:${{ github.sha }}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/els-lmsclient:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/els-lmsclient:buildcache,mode=max
-
+      - name: Update Helm values.yaml for UI
+        run: |
+          echo "🔄 Updating Helm chart for $SERVICE_KEY tag=$VERSION"
+          sed -i "s|\(${SERVICE_KEY}:[[:space:]]*.*tag:[[:space:]]*\"\)[^\"]*\"|\1${VERSION}\"|" "$HELM_PATH"
+          echo "Updated $HELM_PATH:"
+          grep -A2 "$SERVICE_KEY" "$HELM_PATH"
+          
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add "$HELM_PATH"
+          git commit -m "chore: update $SERVICE_KEY image tag to $VERSION" || echo "No changes to commit"
+          git push
       - name: Summary
         run: |
           echo "## ✅ LMS Client Built" >> $GITHUB_STEP_SUMMARY
@@ -208,6 +219,18 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:${{ github.sha }}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:buildcache,mode=max
+      - name: Update Helm values.yaml for API
+        run: |
+          echo "🔄 Updating Helm chart for $SERVICE_KEY tag=$VERSION"
+          sed -i "s|\(${SERVICE_KEY}:[[:space:]]*.*tag:[[:space:]]*\"\)[^\"]*\"|\1${VERSION}\"|" "$HELM_PATH"
+          echo "Updated $HELM_PATH:"
+          grep -A2 "$SERVICE_KEY" "$HELM_PATH"
+          
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add "$HELM_PATH"
+          git commit -m "chore: update $SERVICE_KEY image tag to $VERSION" || echo "No changes to commit"
+          git push
 
       - name: Summary
         run: |
