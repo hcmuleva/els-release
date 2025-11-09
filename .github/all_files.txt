@@ -222,6 +222,39 @@ permissions:
   pull-requests: read
 
 jobs:
+  # Detect changes using path filters
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      lmsclient: ${{ steps.filter.outputs.lmsclient }}
+      lmsserver: ${{ steps.filter.outputs.lmsserver }}
+      helm: ${{ steps.filter.outputs.helm }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            lmsclient:
+              - 'developer/lmsclient/**'
+            lmsserver:
+              - 'developer/lmsserver/**'
+            helm:
+              - 'helm/**'
+            ci:
+              - '.github/workflows/**'
+
+      - name: Show detected changes
+        run: |
+          echo "🔍 Change Detection Results:"
+          echo "LMS Client changed: ${{ steps.filter.outputs.lmsclient }}"
+          echo "LMS Server changed: ${{ steps.filter.outputs.lmsserver }}"
+          echo "Helm charts changed: ${{ steps.filter.outputs.helm }}"
+          echo "CI workflows changed: ${{ steps.filter.outputs.ci }}"
+
   # Validate PR has proper labels for versioning
   validate-labels:
     name: Validate PR Labels
@@ -238,7 +271,6 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Fetch fresh PR data to get updated labels
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -258,50 +290,177 @@ jobs:
               core.info(`✓ Found version label: ${foundLabel}`);
             }
 
-  # Run your tests, linting, etc.
-  test:
-    name: Test & Lint
+  # Test LMS Client (only if changed)
+  test-lmsclient:
+    name: Test LMS Client
     runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.lmsclient == 'true'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run tests
+      - name: Run lmsclient tests
         run: |
-          echo "✓ Tests placeholder - add your test commands"
-          echo "Examples:"
-          echo "  npm test"
-          echo "  go test ./..."
-          echo "  pytest"
+          echo "✓ Running lmsclient tests..."
+          # cd developer/lmsclient
+          # npm test
 
-      - name: Run linting
-        run: |
-          echo "✓ Linting placeholder - add your linting commands"
-          echo "Examples:"
-          echo "  npm run lint"
-          echo "  golangci-lint run"
-          echo "  flake8"
-
-  # Build validation (if you have build steps)
-  build:
-    name: Build
+  # Test LMS Server (only if changed)
+  test-lmsserver:
+    name: Test LMS Server
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.lmsserver == 'true'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build application
+      - name: Run lmsserver tests
         run: |
-          echo "✓ Build placeholder - add your build commands"
-          echo "Examples:"
-          echo "  npm run build"
-          echo "  go build"
-          echo "  docker build -t myapp:${{ github.sha }} ."
+          echo "✓ Running lmsserver tests..."
+          # cd developer/lmsserver
+          # npm test
 
-  # All checks must pass before merge
+  # Build LMS Client Docker Image (only if changed)
+  build-lmsclient:
+    name: Build & Push LMS Client
+    runs-on: ubuntu-latest
+    needs: [detect-changes, test-lmsclient]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.lmsclient == 'true' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ -f VERSION ]; then
+            VERSION=$(cat VERSION)
+          else
+            VERSION="latest"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Building lmsclient version: ${VERSION}"
+
+      - name: Build & Push lmsclient
+        uses: docker/build-push-action@v6
+        with:
+          context: ./developer/lmsclient
+          file: ./developer/lmsclient/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/els-lmsclient:${{ env.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/els-lmsclient:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/els-lmsclient:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/els-lmsclient:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/els-lmsclient:buildcache,mode=max
+      - name: Update Helm values.yaml for UI
+        run: |
+          SERVICE_KEY="els-lms-ui"
+          HELM_PATH="helm/values.yaml"
+          echo "🔄 Updating Helm chart for $SERVICE_KEY tag=$VERSION"
+          
+          yq e -i ".${SERVICE_KEY}.image.tag = \"${VERSION}\"" "$HELM_PATH"
+          
+          echo "✅ Updated $HELM_PATH section for ${SERVICE_KEY}:"
+          yq e ".${SERVICE_KEY}.image" "$HELM_PATH"
+          
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add "$HELM_PATH"
+          git commit -m "chore: update ${SERVICE_KEY} image tag to ${VERSION}" || echo "No changes to commit"
+          git push
+
+      - name: Summary
+        run: |
+          echo "## ✅ LMS Client Built" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/els-lmsclient:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SHA: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # Build LMS Server Docker Image (only if changed)
+  build-lmsserver:
+    name: Build & Push LMS Server
+    runs-on: ubuntu-latest
+    needs: [detect-changes, test-lmsserver]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.lmsserver == 'true' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ -f VERSION ]; then
+            VERSION=$(cat VERSION)
+          else
+            VERSION="latest"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Building lmsserver version: ${VERSION}"
+
+      - name: Build & Push lmsserver
+        uses: docker/build-push-action@v6
+        with:
+          context: ./developer/lmsserver
+          file: ./developer/lmsserver/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:${{ env.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:${{ github.sha }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:buildcache,mode=max
+      - name: Update Helm values.yaml for API
+        run: |
+          SERVICE_KEY="els-lms-api"
+          HELM_PATH="helm/values.yaml"
+          echo "🔄 Updating Helm chart for $SERVICE_KEY tag=$VERSION"
+          
+          yq e -i ".${SERVICE_KEY}.image.tag = \"${VERSION}\"" "$HELM_PATH"
+          
+          echo "✅ Updated $HELM_PATH section for ${SERVICE_KEY}:"
+          yq e ".${SERVICE_KEY}.image" "$HELM_PATH"
+          
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add "$HELM_PATH"
+          git commit -m "chore: update ${SERVICE_KEY} image tag to ${VERSION}" || echo "No changes to commit"
+          git push
+
+      - name: Summary
+        run: |
+          echo "## ✅ LMS Server Built" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SHA: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+ 
+  # CI Success Check
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [validate-labels, test, build]
+    needs: [detect-changes, validate-labels, build-lmsclient, build-lmsserver]
     if: always()
     steps:
       - name: Check all jobs
@@ -309,12 +468,26 @@ jobs:
         with:
           script: |
             const needs = ${{ toJSON(needs) }};
-            const failed = Object.values(needs).some(job => job.result === 'failure');
+            const detectChanges = needs['detect-changes'];
+            const validateLabels = needs['validate-labels'];
+            const buildClient = needs['build-lmsclient'];
+            const buildServer = needs['build-lmsserver'];
+            
+            core.info('📊 Job Results:');
+            core.info(`  - detect-changes: ${detectChanges.result}`);
+            core.info(`  - validate-labels: ${validateLabels.result}`);
+            core.info(`  - build-lmsclient: ${buildClient.result}`);
+            core.info(`  - build-lmsserver: ${buildServer.result}`);
+            
+            // Check if any required job failed
+            const failed = Object.values(needs).some(job => 
+              job.result === 'failure'
+            );
             
             if (failed) {
-              core.setFailed('One or more CI jobs failed');
+              core.setFailed('❌ One or more CI jobs failed');
             } else {
-              core.info('✓ All CI checks passed');
+              core.info('✅ All CI checks passed');
             }
 --- FILE: ./release-drafter.yml ---
 name-template: 'v$RESOLVED_VERSION'
