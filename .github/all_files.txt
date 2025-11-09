@@ -1,0 +1,301 @@
+--- FILE: ./workflows/release.yml ---
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    # Only run when PR is merged (not just closed)
+    if: github.event.pull_request.merged == true
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Draft Release
+        id: drafter
+        uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter.yml
+          publish: false  # Don't publish yet
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(echo "${{ steps.drafter.outputs.tag_name }}" | sed 's/v//g')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${{ steps.drafter.outputs.tag_name }}" >> $GITHUB_OUTPUT
+          echo "📦 Next version: ${{ steps.drafter.outputs.tag_name }}"
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Tag ${{ steps.version.outputs.tag }} already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✓ Tag ${{ steps.version.outputs.tag }} is new"
+          fi
+
+      - name: Update version files
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Create or update VERSION file
+          echo "${VERSION}" > VERSION
+          
+          # If you have package.json
+          if [ -f "package.json" ]; then
+            npm version ${VERSION} --no-git-tag-version --allow-same-version
+          fi
+          
+          # If you have other version files, add them here
+          # sed -i "s/version: .*/version: ${VERSION}/" config.yaml
+          
+          echo "✓ Updated version files to ${VERSION}"
+
+      - name: Commit version bump
+        if: steps.check_tag.outputs.exists == 'false'
+        id: commit
+        run: |
+          git add -A
+          
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No version files to commit"
+          else
+            git commit -m "chore: bump version to ${{ steps.version.outputs.tag }} [skip ci]"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "✓ Committed version bump"
+          fi
+
+      - name: Create and push tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          
+          # Push commit and tag atomically
+          git push origin main
+          git push origin "${{ steps.version.outputs.tag }}"
+          
+          echo "✓ Created and pushed tag ${{ steps.version.outputs.tag }}"
+
+      - name: Publish Release
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const release_id = '${{ steps.drafter.outputs.id }}';
+            
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release_id,
+              draft: false
+            });
+            
+            core.info('✓ Published release ${{ steps.version.outputs.tag }}');
+
+      - name: Summary
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          echo "## 🚀 Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release URL:** ${{ steps.drafter.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Merged PR:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+--- FILE: ./workflows/pr-labeler.yml ---
+name: PR Labeler
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    name: Auto-label PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auto-label based on branch name
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const labels = [];
+            
+            // Auto-label based on branch naming convention
+            if (branch.startsWith('feature/') || branch.startsWith('feat/')) {
+              labels.push('feature', 'minor');
+            } else if (branch.startsWith('fix/') || branch.startsWith('bugfix/')) {
+              labels.push('bug', 'patch');
+            } else if (branch.startsWith('hotfix/')) {
+              labels.push('bug', 'patch');
+            } else if (branch.startsWith('chore/')) {
+              labels.push('chore', 'patch');
+            } else if (branch.startsWith('docs/')) {
+              labels.push('documentation', 'patch');
+            }
+            
+            // Add labels if any were determined
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: labels
+              });
+              
+              core.info(`✓ Added labels: ${labels.join(', ')}`);
+            } else {
+              core.warning('⚠️ No auto-labels determined. Please add version label (major/minor/patch) manually.');
+            }
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const body = `
+            ## 🏷️ PR Labels
+            
+            This PR has been automatically labeled based on the branch name: \`${branch}\`
+            
+            **Version Impact:**
+            - \`major\`: Breaking changes (e.g., v1.0.0 → v2.0.0)
+            - \`minor\`: New features (e.g., v1.0.0 → v1.1.0)
+            - \`patch\`: Bug fixes/chores (e.g., v1.0.0 → v1.0.1)
+            
+            If the auto-label is incorrect, please update the labels before merging.
+            `;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: body
+            });
+--- FILE: ./workflows/ci.yml ---
+
+--- FILE: ./release-drafter.yml ---
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+# Changelog template
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+
+# Categories for organizing changes
+categories:
+  - title: '🚀 Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'fix'
+      - 'bugfix'
+      - 'bug'
+  - title: '📚 Documentation'
+    labels:
+      - 'documentation'
+      - 'docs'
+  - title: '🔧 Maintenance'
+    labels:
+      - 'chore'
+      - 'dependencies'
+      - 'refactor'
+  - title: '⚡ Performance'
+    labels:
+      - 'performance'
+      - 'optimization'
+
+# Exclude certain changes from changelog
+exclude-labels:
+  - 'skip-changelog'
+  - 'duplicate'
+  - 'invalid'
+  - 'wontfix'
+
+# Semantic versioning resolution
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking'
+      - 'breaking-change'
+  minor:
+    labels:
+      - 'minor'
+      - 'feature'
+      - 'enhancement'
+  patch:
+    labels:
+      - 'patch'
+      - 'fix'
+      - 'bugfix'
+      - 'bug'
+      - 'chore'
+      - 'dependencies'
+  default: patch
+
+# Release notes template
+template: |
+  ## What's Changed
+  
+  $CHANGES
+  
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+  
+  ---
+  
+  ### Contributors
+  $CONTRIBUTORS
+
+# Autolabeler (optional - automatically adds labels based on branch names or file paths)
+autolabeler:
+  - label: 'feature'
+    branch:
+      - '/^feature\/.+/'
+      - '/^feat\/.+/'
+  - label: 'bug'
+    branch:
+      - '/^fix\/.+/'
+      - '/^bugfix\/.+/'
+  - label: 'chore'
+    branch:
+      - '/^chore\/.+/'
+  - label: 'documentation'
+    files:
+      - '*.md'
+      - 'docs/*'
