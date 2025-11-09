@@ -9,6 +9,7 @@ export default {
    */
   register(/* { strapi }: { strapi: Core.Strapi } */) {},
 
+  
   /**
    * An asynchronous bootstrap function that runs before
    * your application gets started.
