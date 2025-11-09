@@ -1,0 +1,96 @@
+{
+  "kind": "collectionType",
+  "collectionName": "questions",
+  "info": {
+    "singularName": "question",
+    "pluralName": "questions",
+    "displayName": "Question",
+    "description": "Questions for exams and quizzes"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "questionText": {
+      "type": "richtext",
+      "required": true
+    },
+    "questionType": {
+      "type": "enumeration",
+      "enum": [
+        "multiple-choice",
+        "true-false",
+        "short-answer",
+        "essay",
+        "fill-in-blank",
+        "matching"
+      ],
+      "default": "multiple-choice",
+      "required": true
+    },
+    "difficultyLevel": {
+      "type": "enumeration",
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        "expert"
+      ],
+      "default": "medium"
+    },
+    "points": {
+      "type": "integer",
+      "default": 1,
+      "min": 1
+    },
+    "options": {
+      "type": "json",
+      "description": "Answer options for multiple choice questions. Format: [{\"id\":\"a\",\"text\":\"Option A\",\"isCorrect\":false}]"
+    },
+    "correctAnswer": {
+      "type": "text",
+      "description": "Correct answer for short-answer, essay, or fill-in-blank questions"
+    },
+    "explanation": {
+      "type": "richtext",
+      "description": "Explanation shown after answering"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "timeLimit": {
+      "type": "integer",
+      "description": "Time limit in seconds (optional)"
+    },
+    "tags": {
+      "type": "json",
+      "description": "Tags for categorization"
+    },
+    "subject": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::subject.subject"
+    },
+    "course": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::course.course"
+    },
+    "exams": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::exam.exam",
+      "inversedBy": "questions"
+    },
+    "createdBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

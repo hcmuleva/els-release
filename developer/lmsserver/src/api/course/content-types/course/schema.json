@@ -1,0 +1,99 @@
+{
+  "kind": "collectionType",
+  "collectionName": "courses",
+  "info": {
+    "singularName": "course",
+    "pluralName": "courses",
+    "displayName": "course"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "agegroup": {
+      "type": "enumeration",
+      "enum": [
+        "toddler",
+        "pre-school",
+        "primary-school",
+        "middle-school",
+        "high-school",
+        "highersecondary-school",
+        "college"
+      ]
+    },
+    "covericon": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "subtitle": {
+      "type": "string"
+    },
+    "description": {
+      "type": "blocks"
+    },
+    "course_images": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "course_video": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "youtube_url": {
+      "type": "string"
+    },
+    "subjects": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::subject.subject",
+      "mappedBy": "course"
+    },
+    "grade": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::grade.grade",
+      "inversedBy": "courses"
+    },
+    "instructor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "teachingCourses"
+    },
+    "enrolments": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::enrolment.enrolment",
+      "mappedBy": "course"
+    },
+    "results": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::result.result",
+      "mappedBy": "course"
+    }
+  }
+}
