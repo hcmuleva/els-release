@@ -215,6 +215,74 @@ jobs:
           echo "- Version: ${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- Image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/els-lmsserver:${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- SHA: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+  update-helm:
+    name: 🧩 Update Helm Chart and Trigger ArgoCD
+    runs-on: ubuntu-latest
+    needs: [build-lmsclient, build-lmsserver]
+    if: |
+      always() &&
+      (needs.build-lmsclient.result == 'success' || needs.build-lmsserver.result == 'success')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set variables
+        run: |
+          echo "CLIENT_CHANGED=${{ needs.build-lmsclient.result == 'success' && needs.detect-changes.outputs.lmsclient == 'true' }}" >> $GITHUB_ENV
+          echo "SERVER_CHANGED=${{ needs.build-lmsserver.result == 'success' && needs.detect-changes.outputs.lmsserver == 'true' }}" >> $GITHUB_ENV
+          echo "VERSION_FILE=VERSION" >> $GITHUB_ENV
+          echo "HELM_PATH=helm/values.yaml" >> $GITHUB_ENV
+
+      - name: Read Version
+        id: version
+        run: |
+          if [ -f $VERSION_FILE ]; then
+            VERSION=$(cat $VERSION_FILE)
+          else
+            VERSION="latest"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Update Helm chart image tags
+        if: ${{ env.CLIENT_CHANGED == 'true' || env.SERVER_CHANGED == 'true' }}
+        run: |
+          echo "🔧 Updating Helm chart at $HELM_PATH ..."
+          
+          if [ "${{ env.CLIENT_CHANGED }}" = "true" ]; then
+            echo "📦 Updating lmsclient image tag to ${{ env.VERSION }}"
+            sed -i "s|\(els-lmsclient:\).*|\1${{ env.VERSION }}|" $HELM_PATH
+          fi
+
+          if [ "${{ env.SERVER_CHANGED }}" = "true" ]; then
+            echo "📦 Updating lmsserver image tag to ${{ env.VERSION }}"
+            sed -i "s|\(els-lmsserver:\).*|\1${{ env.VERSION }}|" $HELM_PATH
+          fi
+
+          echo "✅ Helm chart updated successfully"
+
+      - name: Commit and push Helm changes
+        if: ${{ env.CLIENT_CHANGED == 'true' || env.SERVER_CHANGED == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add $HELM_PATH
+          git commit -m "🔄 Update Helm chart image tags [client/server] -> ${{ env.VERSION }}"
+          git push
+
+      - name: Summary
+        run: |
+          echo "## 🚀 Helm Chart Updated" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ env.CLIENT_CHANGED }}" = "true" ]; then
+            echo "- Updated: els-lmsclient" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ env.SERVER_CHANGED }}" = "true" ]; then
+            echo "- Updated: els-lmsserver" >> $GITHUB_STEP_SUMMARY
+          fi
 
   # CI Success Check
   ci-success:
