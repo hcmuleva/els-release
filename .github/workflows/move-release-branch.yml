@@ -1,0 +1,47 @@
+name: Move Release Branch
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  move-release-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Move Release Branch
+        run: |
+          MAJOR_BRANCH_NAME=$(echo ${{ github.event.release.tag_name }} | sed -E "s/(v[0-9]+).*/\1/g")
+          MINOR_BRANCH_NAME=$(echo ${{ github.event.release.tag_name }} | sed -E "s/(v[0-9]+[.][0-9]+).*/\1/g")
+          COMMIT_HASH=$(git rev-parse HEAD)
+          
+          git fetch origin
+          
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          
+          if git show-ref --quiet --branches ${MAJOR_BRANCH_NAME}; then
+            echo "Branch ${MAJOR_BRANCH_NAME} already exists. Moving HEAD to ${COMMIT_HASH}"
+            git checkout ${MAJOR_BRANCH_NAME}
+            git reset --hard ${COMMIT_HASH}
+          else
+            echo "Branch ${MAJOR_BRANCH_NAME} does not exist. Creating a new branch"
+            git checkout -b ${MAJOR_BRANCH_NAME}
+          fi
+
+          git push --force origin ${MAJOR_BRANCH_NAME}
+          
+          if git show-ref --quiet --branches ${MINOR_BRANCH_NAME}; then
+            echo "Branch ${MINOR_BRANCH_NAME} already exists. Moving HEAD to ${COMMIT_HASH}"
+            git checkout ${MINOR_BRANCH_NAME}
+            git reset --hard ${COMMIT_HASH}
+          else
+            echo "Branch ${MINOR_BRANCH_NAME} does not exist. Creating a new branch"
+            git checkout -b ${MINOR_BRANCH_NAME}
+          fi
+          
+          git push --force origin ${MINOR_BRANCH_NAME}
