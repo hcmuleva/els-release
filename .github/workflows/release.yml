@@ -1,129 +1,50 @@
 name: Release
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the main branch
 on:
   push:
     branches:
-      - master
       - main
+  pull_request:
+    types: [opened, reopened, synchronize, closed, labeled, unlabeled]
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   release:
-    permissions:
-      # write permission is required to create a github release
-      contents: write
-      # write permission is required for autolabeler
-      # otherwise, read permission is required at least
-      pull-requests: write
-
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - uses: actions/checkout@v4
 
-      # Drafts your next Release notes as Pull Requests are merged into "main"
-      - name: Create release
-        id: create-release
+      - name: Create Release
+        id: drafter
         uses: release-drafter/release-drafter@v6
         with:
-          # (Optional) specify config name to use, relative to .github/. Default: release-drafter.yml
           config-name: release-drafter.yaml
-          publish: false
-          prerelease: false
+          publish: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
 
-      - name: Setup node
-        uses: actions/setup-node@v4
-
-      - name: Setup git config
+      - name: Setup Git
         run: |
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          
-          git status
-
-      - name: Update package.json versions
-        run: |
-          TAG_NAME=$(echo "${{ steps.create-release.outputs.tag_name }}" | sed "s/v//g")
-          
-          find . -path "*/node_modules" -prune -o -name package.json -exec dirname {} \; | while read jsdir; do
-            echo "Updating ${jsdir}/package.json to ${TAG_NAME}"
-            if [[ "${jsdir}" == "." ]]; then
-              npm version "${TAG_NAME}" --no-git-tag-version --allow-same-version
-              npm ci --omit=dev 
-            else
-              (cd $jsdir && npm version "${TAG_NAME}" --no-git-tag-version --allow-same-version && npm ci --omit=dev)
-            fi
-          done
-          
-          git add -u
-          git status
-
-      - name: Build javascript
-        run: |
-          npm ci
-          npm run build
-          
-          git add -u
-
-      - name: Update helm chart versions
-        run: |
-          export VERSION=$(echo "${{ steps.create-release.outputs.tag_name }}" | sed "s/v//g")
-          export APP_VERSION="${{ steps.create-release.outputs.tag_name }}"
-          
-          find . -name "Chart.yaml" -exec dirname {} \; | while read chartdir; do
-            # Replace blank lines with a temporary marker
-            sed -i '/^$/s// #BLANK_LINE/' ${chartdir}/Chart.yaml
-            sed -i '/^$/s// #BLANK_LINE/' ${chartdir}/values.yaml
-          
-            yq -i '.version = env(VERSION)' ${chartdir}/Chart.yaml
-            yq -i '.appVersion = env(APP_VERSION)' ${chartdir}/Chart.yaml
-            yq -i '.global.appVersion = env(APP_VERSION)' ${chartdir}/values.yaml
-          
-            # Restore blank lines
-            sed -i "s/ *#BLANK_LINE//g" ${chartdir}/Chart.yaml
-            sed -i "s/ *#BLANK_LINE//g" ${chartdir}/values.yaml
-          done
-          
-          git add -u
-          git status
-
-      - name: Commit version update
-        id: commit-version-update
-        run: |
-          TAG_NAME="${{ steps.create-release.outputs.tag_name }}"
-          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          
-          echo "Current branch: ${CURRENT_BRANCH}"
-          git status
-
-          if ! git diff --cached --quiet; then
-            git checkout -b release/${TAG_NAME}
-          
-            echo "Committing and pushing changes"
-            git commit -m "Update version to ${TAG_NAME}"
-            git push origin release/${TAG_NAME}
-          
-            echo "skip_release=true" >> "$GITHUB_OUTPUT"
-          
-            gh pr create --fill --base "${CURRENT_BRANCH}" --head release/${TAG_NAME} --label "automerge" --label "patch" --label "chore"
-            gh pr merge --squash --delete-branch release/${TAG_NAME}
-          else
-            echo "No changes to commit"
-          fi
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
 
-      - name: Publish release
-        if: ${{ !contains(steps.commit-version-update.outputs.skip_release, 'true') }}
+      - name: Update Helm versions
         run: |
-          gh release edit ${{ steps.create-release.outputs.tag_name }} --draft=false
+          VERSION=$(echo "${{ steps.drafter.outputs.tag_name }}" | sed "s/v//g")
+          find . -name Chart.yaml -exec yq -i ".version = env(VERSION)" {} \;
+
+      - name: Commit changes
+        run: |
+          git add -u
+          git commit -m "chore: bump to ${{ steps.drafter.outputs.tag_name }}" || echo "No changes"
+          git push
+
+      - name: Publish Release
+        run: gh release edit ${{ steps.drafter.outputs.tag_name }} --draft=false
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
