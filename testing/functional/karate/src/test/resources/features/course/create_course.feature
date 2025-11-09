@@ -7,6 +7,8 @@ Background:
   * def token = authData.setupData.token
   * print '🧩 Using token from auth:', token
 
+  
+@smoke @regression
 Scenario: Create a new course entry
   * def coursename = 'course_' + java.util.UUID.randomUUID().toString()
 

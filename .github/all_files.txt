@@ -206,7 +206,116 @@ jobs:
               body: body
             });
 --- FILE: ./workflows/ci.yml ---
+name: CI
 
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Validate PR has proper labels for versioning
+  validate-labels:
+    name: Validate PR Labels
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Wait for auto-labeler
+        if: github.event.action == 'opened' || github.event.action == 'reopened'
+        run: |
+          echo "⏳ Waiting 5 seconds for auto-labeler to complete..."
+          sleep 5
+
+      - name: Check for version label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Fetch fresh PR data to get updated labels
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            
+            const labels = pr.labels.map(l => l.name);
+            const versionLabels = ['major', 'minor', 'patch'];
+            const hasVersionLabel = labels.some(label => versionLabels.includes(label));
+            
+            core.info(`Current labels: ${labels.join(', ')}`);
+            
+            if (!hasVersionLabel) {
+              core.setFailed('❌ PR must have one of: major, minor, or patch label');
+            } else {
+              const foundLabel = labels.find(l => versionLabels.includes(l));
+              core.info(`✓ Found version label: ${foundLabel}`);
+            }
+
+  # Run your tests, linting, etc.
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          echo "✓ Tests placeholder - add your test commands"
+          echo "Examples:"
+          echo "  npm test"
+          echo "  go test ./..."
+          echo "  pytest"
+
+      - name: Run linting
+        run: |
+          echo "✓ Linting placeholder - add your linting commands"
+          echo "Examples:"
+          echo "  npm run lint"
+          echo "  golangci-lint run"
+          echo "  flake8"
+
+  # Build validation (if you have build steps)
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build application
+        run: |
+          echo "✓ Build placeholder - add your build commands"
+          echo "Examples:"
+          echo "  npm run build"
+          echo "  go build"
+          echo "  docker build -t myapp:${{ github.sha }} ."
+
+  # All checks must pass before merge
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [validate-labels, test, build]
+    if: always()
+    steps:
+      - name: Check all jobs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const needs = ${{ toJSON(needs) }};
+            const failed = Object.values(needs).some(job => job.result === 'failure');
+            
+            if (failed) {
+              core.setFailed('One or more CI jobs failed');
+            } else {
+              core.info('✓ All CI checks passed');
+            }
 --- FILE: ./release-drafter.yml ---
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'

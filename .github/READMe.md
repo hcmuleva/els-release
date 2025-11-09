@@ -309,6 +309,19 @@ graph TD
 
 ---
 
+| Branch Prefix | Auto Labels | Label Color | Version Bump | Example |
+|--------------|-------------|-------------|--------------|---------|
+| `feature/` or `feat/` | `feature` | `#a2eeef` | **minor** | v1.0.0 → v1.1.0 |
+| `fix/` or `bugfix/` | `bug` | `#d73a4a` | **patch** | v1.0.0 → v1.0.1 |
+| `chore/` | `chore` | `#fef2c0` | **patch** | v1.0.0 → v1.0.1 |
+| `docs/` | `documentation` | `#0075ca` | **patch** | v1.0.0 → v1.0.1 |
+
+### Manual Version Labels:
+| Label | Color | Description | Version Bump | Example |
+|-------|-------|-------------|--------------|---------|
+| `major` | `#d73a4a` | Breaking changes | **major** | v1.0.0 → v2.0.0 |
+| `minor` | `#0075ca` | New features | **minor** | v1.0.0 → v1.1.0 |
+| `patch` | `#0e8a16` | Bug fixes | **patch** | v1.0.0 → v1.0.1 |
 ## 📚 Additional Resources
 
 - [GitHub Flow](https://docs.github.com/en/get-started/quickstart/github-flow)
@@ -319,3 +332,48 @@ graph TD
 ---
 
 **Need help?** Open an issue or contact the DevOps team!
+## 🏷️ Branch Labeling Strategy
+## 🏷️ Labeling Strategy
+
+### Automatic Labels (via branch name):
+- `feature/*` or `feat/*` → `feature` + `minor`
+- `fix/*` or `bugfix/*` → `bug` + `patch` 
+- `chore/*` → `chore` + `patch`
+- `docs/*` → `documentation` + `patch`
+
+### Manual Version Labels:
+- `major` - Breaking changes (1.0.0 → 2.0.0)
+- `minor` - New features (1.0.0 → 1.1.0)
+- `patch` - Bug fixes (1.0.0 → 1.0.1)
+
+### Label Colors & Setup:
+```bash
+# Version labels
+gh label create major --color "d73a4a" --description "Breaking changes"
+gh label create minor --color "0075ca" --description "New features"
+gh label create patch --color "0e8a16" --description "Bug fixes"
+
+# Type labels
+gh label create feature --color "a2eeef" --description "New feature"
+gh label create bug --color "d73a4a" --description "Bug fix"
+gh label create chore --color "fef2c0" --description "Maintenance"
+gh label create documentation --color "0075ca" --description "Documentation"
+## Visual Version with Color Badges:
+
+```markdown
+## 🏷️ Labeling Strategy
+
+### Automatic Branch Labels:
+| Branch Pattern | Auto-Labels | Version | Example |
+|---------------|-------------|---------|---------|
+| `feature/`, `feat/` | <span style="color:#a2eeef">■</span> `feature` | <span style="color:#0075ca">■</span> **minor** | v1.0.0 → v1.1.0 |
+| `fix/`, `bugfix/` | <span style="color:#d73a4a">■</span> `bug` | <span style="color:#0e8a16">■</span> **patch** | v1.0.0 → v1.0.1 |
+| `chore/` | <span style="color:#fef2c0">■</span> `chore` | <span style="color:#0e8a16">■</span> **patch** | v1.0.0 → v1.0.1 |
+| `docs/` | <span style="color:#0075ca">■</span> `documentation` | <span style="color:#0e8a16">■</span> **patch** | v1.0.0 → v1.0.1 |
+
+### Manual Version Overrides:
+| Label | Color | Version | Example |
+|-------|-------|---------|---------|
+| <span style="color:#d73a4a">■</span> `major` | `#d73a4a` | **major** | v1.0.0 → v2.0.0 |
+| <span style="color:#0075ca">■</span> `minor` | `#0075ca` | **minor** | v1.0.0 → v1.1.0 |
+| <span style="color:#0e8a16">■</span> `patch` | `#0e8a16` | **patch** | v1.0.0 → v1.0.1 |

@@ -1,0 +1,29 @@
+OUTPUT_FILE="all_files.txt"
+
+# List of binary extensions to skip (space separated in the pattern)
+BINARY_EXTENSIONS="*.md *.png *.jpg *.jpeg *.gif *.pdf *.zip *.tar *.gz *.o *.obj *.exe *.dll *.bin *.ttf *.woff *.woff2 *.class *.jar"
+
+find . -type f ! -name "$OUTPUT_FILE" ! -path "*/node_modules/*" ! -name "*.md" ! -name "*.sh" ! -name "Makefile" -print0 | while IFS= read -r -d '' file; do
+    if [ -r "$file" ]; then
+        # Check if the file extension matches any of the binary extensions
+        skip=false
+        for ext in $BINARY_EXTENSIONS; do
+            # Using case insensitive matching for extensions
+            if [[ "$file" =~ \.$ext$ ]]; then
+                skip=true
+                break
+            fi
+        done
+
+        if [ "$skip" = true ]; then
+            echo "--- FILE: $file --- (binary, skipped)"
+        else
+            echo "--- FILE: $file ---"
+            cat "$file"
+            echo ""
+        fi
+    else
+        echo "--- FILE: $file --- (unreadable, skipped)"
+    fi
+done > "$OUTPUT_FILE"
+

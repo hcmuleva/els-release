@@ -1,0 +1,6 @@
+apiVersion: v2
+name: els-lms-ui
+description: ELS-LMS Frontend UI (React)
+version: 0.1.0
+appVersion: "1.0"
+type: application

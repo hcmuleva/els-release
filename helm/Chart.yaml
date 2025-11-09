@@ -1,0 +1,41 @@
+apiVersion: v2
+name: els-lms-stack
+description: Complete ELS-LMS application stack with PostgreSQL, Strapi API, and React UI
+type: application
+version: 1.0.0
+appVersion: "1.0"
+
+keywords:
+  - ELS-LMS
+  - full-stack
+  - react
+  - strapi
+  - postgres
+
+maintainers:
+  - name: DevOps Team
+    email: devops@ELS-LMS.local
+
+dependencies:
+  - name: postgres
+    version: "1.0.0"
+    repository: "file://./charts/postgres"
+    condition: postgres.enabled
+    tags:
+      - database
+  
+  - name: els-lms-api
+    version: "0.1.0"
+    repository: "file://./charts/els-lms-api"
+    condition: els-lms-api.enabled
+    tags:
+      - backend
+      - api
+  
+  - name: els-lms-ui
+    version: "0.1.0"
+    repository: "file://./charts/els-lms-ui"
+    condition: els-lms-ui.enabled
+    tags:
+      - frontend
+      - ui

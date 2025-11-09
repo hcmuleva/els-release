@@ -1,5 +1,0 @@
-apiVersion: v2
-name: temple-api
-description: Strapi API server for Temple application
-version: 0.1.0
-appVersion: "1.12"

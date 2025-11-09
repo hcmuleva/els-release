@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: els-lms
+  namespace: argocd
+spec:
+  description: ELS Learning Management System Project
+  
+  sourceRepos:
+    - '*'
+  
+  destinations:
+    - namespace: 'els-lms-*'
+      server: https://kubernetes.default.svc
+  
+    - namespace: 'school-*'
+      server: https://kubernetes.default.svc
+  
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
