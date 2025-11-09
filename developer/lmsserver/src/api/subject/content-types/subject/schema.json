@@ -11,6 +11,7 @@
   },
   "pluginOptions": {},
   "attributes": {
+    
     "name": {
       "type": "string"
     },
