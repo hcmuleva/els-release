@@ -1,11 +1,10 @@
 name: Release
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches:
       - main
-  pull_request:
-    types: [opened, reopened, synchronize, closed, labeled, unlabeled]
 
 permissions:
   contents: write
@@ -13,38 +12,117 @@ permissions:
 
 jobs:
   release:
+    name: Create Release
     runs-on: ubuntu-latest
+    # Only run when PR is merged (not just closed)
+    if: github.event.pull_request.merged == true
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Create Release
-        id: drafter
-        uses: release-drafter/release-drafter@v6
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          config-name: release-drafter.yaml
-          publish: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Git
         run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+      - name: Draft Release
+        id: drafter
+        uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter.yml
+          publish: false  # Don't publish yet
         env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update Helm versions
+      - name: Extract version
+        id: version
         run: |
-          VERSION=$(echo "${{ steps.drafter.outputs.tag_name }}" | sed "s/v//g")
-          find . -name Chart.yaml -exec yq -i ".version = env(VERSION)" {} \;
+          VERSION=$(echo "${{ steps.drafter.outputs.tag_name }}" | sed 's/v//g')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${{ steps.drafter.outputs.tag_name }}" >> $GITHUB_OUTPUT
+          echo "📦 Next version: ${{ steps.drafter.outputs.tag_name }}"
 
-      - name: Commit changes
+      - name: Check if tag exists
+        id: check_tag
         run: |
-          git add -u
-          git commit -m "chore: bump to ${{ steps.drafter.outputs.tag_name }}" || echo "No changes"
-          git push
+          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Tag ${{ steps.version.outputs.tag }} already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✓ Tag ${{ steps.version.outputs.tag }} is new"
+          fi
+
+      - name: Update version files
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Create or update VERSION file
+          echo "${VERSION}" > VERSION
+          
+          # If you have package.json
+          if [ -f "package.json" ]; then
+            npm version ${VERSION} --no-git-tag-version --allow-same-version
+          fi
+          
+          # If you have other version files, add them here
+          # sed -i "s/version: .*/version: ${VERSION}/" config.yaml
+          
+          echo "✓ Updated version files to ${VERSION}"
+
+      - name: Commit version bump
+        if: steps.check_tag.outputs.exists == 'false'
+        id: commit
+        run: |
+          git add -A
+          
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No version files to commit"
+          else
+            git commit -m "chore: bump version to ${{ steps.version.outputs.tag }} [skip ci]"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "✓ Committed version bump"
+          fi
+
+      - name: Create and push tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          
+          # Push commit and tag atomically
+          git push origin main
+          git push origin "${{ steps.version.outputs.tag }}"
+          
+          echo "✓ Created and pushed tag ${{ steps.version.outputs.tag }}"
 
       - name: Publish Release
-        run: gh release edit ${{ steps.drafter.outputs.tag_name }} --draft=false
-        env:
-          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+        if: steps.check_tag.outputs.exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const release_id = '${{ steps.drafter.outputs.id }}';
+            
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release_id,
+              draft: false
+            });
+            
+            core.info('✓ Published release ${{ steps.version.outputs.tag }}');
+
+      - name: Summary
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          echo "## 🚀 Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release URL:** ${{ steps.drafter.outputs.html_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Merged PR:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY

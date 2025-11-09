@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Validate PR has proper labels for versioning
+  validate-labels:
+    name: Validate PR Labels
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check for version label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            const versionLabels = ['major', 'minor', 'patch'];
+            const hasVersionLabel = labels.some(label => versionLabels.includes(label));
+            
+            if (!hasVersionLabel) {
+              core.setFailed('PR must have one of: major, minor, or patch label');
+            } else {
+              core.info(`✓ Found version label: ${labels.find(l => versionLabels.includes(l))}`);
+            }
+
+  # Run your tests, linting, etc.
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          echo "✓ Tests placeholder - add your test commands"
+          echo "Examples:"
+          echo "  npm test"
+          echo "  go test ./..."
+          echo "  pytest"
+
+      - name: Run linting
+        run: |
+          echo "✓ Linting placeholder - add your linting commands"
+          echo "Examples:"
+          echo "  npm run lint"
+          echo "  golangci-lint run"
+          echo "  flake8"
+
+  # Build validation (if you have build steps)
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build application
+        run: |
+          echo "✓ Build placeholder - add your build commands"
+          echo "Examples:"
+          echo "  npm run build"
+          echo "  go build"
+          echo "  docker build -t myapp:${{ github.sha }} ."
+
+  # All checks must pass before merge
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [validate-labels, test, build]
+    if: always()
+    steps:
+      - name: Check all jobs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const needs = ${{ toJSON(needs) }};
+            const failed = Object.values(needs).some(job => job.result === 'failure');
+            
+            if (failed) {
+              core.setFailed('One or more CI jobs failed');
+            } else {
+              core.info('✓ All CI checks passed');
+            }
