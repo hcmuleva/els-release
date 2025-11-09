@@ -1,0 +1,91 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+# Changelog template
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+
+# Categories for organizing changes
+categories:
+  - title: '🚀 Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: '🐛 Bug Fixes'
+    labels:
+      - 'fix'
+      - 'bugfix'
+      - 'bug'
+  - title: '📚 Documentation'
+    labels:
+      - 'documentation'
+      - 'docs'
+  - title: '🔧 Maintenance'
+    labels:
+      - 'chore'
+      - 'dependencies'
+      - 'refactor'
+  - title: '⚡ Performance'
+    labels:
+      - 'performance'
+      - 'optimization'
+
+# Exclude certain changes from changelog
+exclude-labels:
+  - 'skip-changelog'
+  - 'duplicate'
+  - 'invalid'
+  - 'wontfix'
+
+# Semantic versioning resolution
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking'
+      - 'breaking-change'
+  minor:
+    labels:
+      - 'minor'
+      - 'feature'
+      - 'enhancement'
+  patch:
+    labels:
+      - 'patch'
+      - 'fix'
+      - 'bugfix'
+      - 'bug'
+      - 'chore'
+      - 'dependencies'
+  default: patch
+
+# Release notes template
+template: |
+  ## What's Changed
+  
+  $CHANGES
+  
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION
+  
+  ---
+  
+  ### Contributors
+  $CONTRIBUTORS
+
+# Autolabeler (optional - automatically adds labels based on branch names or file paths)
+autolabeler:
+  - label: 'feature'
+    branch:
+      - '/^feature\/.+/'
+      - '/^feat\/.+/'
+  - label: 'bug'
+    branch:
+      - '/^fix\/.+/'
+      - '/^bugfix\/.+/'
+  - label: 'chore'
+    branch:
+      - '/^chore\/.+/'
+  - label: 'documentation'
+    files:
+      - '*.md'
+      - 'docs/*'

@@ -1,0 +1,77 @@
+name: PR Labeler
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    name: Auto-label PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auto-label based on branch name
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const labels = [];
+            
+            // Auto-label based on branch naming convention
+            if (branch.startsWith('feature/') || branch.startsWith('feat/')) {
+              labels.push('feature', 'minor');
+            } else if (branch.startsWith('fix/') || branch.startsWith('bugfix/')) {
+              labels.push('bug', 'patch');
+            } else if (branch.startsWith('hotfix/')) {
+              labels.push('bug', 'patch');
+            } else if (branch.startsWith('chore/')) {
+              labels.push('chore', 'patch');
+            } else if (branch.startsWith('docs/')) {
+              labels.push('documentation', 'patch');
+            }
+            
+            // Add labels if any were determined
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: labels
+              });
+              
+              core.info(`✓ Added labels: ${labels.join(', ')}`);
+            } else {
+              core.warning('⚠️ No auto-labels determined. Please add version label (major/minor/patch) manually.');
+            }
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+            const body = `
+            ## 🏷️ PR Labels
+            
+            This PR has been automatically labeled based on the branch name: \`${branch}\`
+            
+            **Version Impact:**
+            - \`major\`: Breaking changes (e.g., v1.0.0 → v2.0.0)
+            - \`minor\`: New features (e.g., v1.0.0 → v1.1.0)
+            - \`patch\`: Bug fixes/chores (e.g., v1.0.0 → v1.0.1)
+            
+            If the auto-label is incorrect, please update the labels before merging.
+            `;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: body
+            });
