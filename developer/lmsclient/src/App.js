@@ -8,6 +8,7 @@ import {
 } from "./pages/teacher";
 import { AuthContext } from "./AuthContext";
 
+
 function App() {
   const { token } = useContext(AuthContext); // ✅ Use context instead of localStorage
 
