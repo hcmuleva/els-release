@@ -1,0 +1,47 @@
+{
+  "kind": "collectionType",
+  "collectionName": "enrolments",
+  "info": {
+    "singularName": "enrolment",
+    "pluralName": "enrolments",
+    "displayName": "enrolment"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "students": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "mappedBy": "student_enrolments"
+    },
+    "course": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::course.course",
+      "inversedBy": "enrolments"
+    },
+    "enrolment_status": {
+      "type": "enumeration",
+      "enum": [
+        "active",
+        "completed",
+        "inprogress",
+        "dropped",
+        "notstarted",
+        "overdue"
+      ]
+    },
+    "progress": {
+      "type": "decimal"
+    },
+    "teachers": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "teaching_enrolments"
+    }
+  }
+}

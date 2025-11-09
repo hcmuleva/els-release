@@ -1,0 +1,104 @@
+{
+  "kind": "collectionType",
+  "collectionName": "results",
+  "info": {
+    "singularName": "result",
+    "pluralName": "results",
+    "displayName": "Result",
+    "description": "Student academic results and performance records"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "resultType": {
+      "type": "enumeration",
+      "required": true,
+      "default": "exam",
+      "enum": [
+        "exam",
+        "assignment",
+        "quiz",
+        "course-final",
+        "subject-final"
+      ]
+    },
+    "score": {
+      "type": "decimal",
+      "required": true
+    },
+    "maxScore": {
+      "type": "decimal",
+      "required": true
+    },
+    "percentage": {
+      "type": "decimal"
+    },
+    "grade": {
+      "type": "string"
+    },
+    "gpa": {
+      "type": "decimal"
+    },
+    "passed": {
+      "type": "boolean",
+      "required": true,
+      "default": false
+    },
+    "rank": {
+      "type": "integer"
+    },
+    "remarks": {
+      "type": "text"
+    },
+    "feedback": {
+      "type": "richtext"
+    },
+    "isPublished": {
+      "type": "boolean",
+      "default": false
+    },
+    "academicYear": {
+      "type": "string"
+    },
+    "semester": {
+      "type": "enumeration",
+      "enum": [
+        "semester-1",
+        "semester-2",
+        "semester-3",
+        "summer"
+      ]
+    },
+    "student": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "results"
+    },
+    "course": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::course.course",
+      "inversedBy": "results"
+    },
+    "subject": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::subject.subject",
+      "inversedBy": "results"
+    },
+    "exam": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::exam.exam",
+      "inversedBy": "results"
+    },
+    "exam_attempt": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::exam-attempt.exam-attempt"
+    }
+  }
+}
