@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  strapi:
+    build: .
+    ports:
+      - "1337:1337"
+    environment:
+      NODE_ENV: development
+      DATABASE_CLIENT: sqlite
+      DATABASE_NAME: strapi
+      JWT_SECRET: your-jwt-secret
+      ADMIN_JWT_SECRET: your-admin-jwt-secret
+      APP_KEYS: your-app-keys
+    volumes:
+      - ./config:/app/config
+      - ./src:/app/src
+      - ./package.json:/app/package.json
+      - ./public/uploads:/app/public/uploads
+    restart: unless-stopped
