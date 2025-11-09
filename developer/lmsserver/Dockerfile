@@ -4,9 +4,8 @@ WORKDIR /app
 
 # Copy package files first for better caching
 COPY package.json package-lock.json* ./
+RUN npm install pg --save && npm install
 
-# Install dependencies
-RUN npm install
 
 # Copy source code
 COPY . .
