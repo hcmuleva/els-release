@@ -1,51 +1,50 @@
 # ============================================
-# Temple Stack - Base Configuration
+# ELS-LMS Stack - Base Configuration
 # ============================================
 
 global:
-  imagePullPolicy: IfNotPresent
-  namespace: els-lms
-  domain: els-lms.local
-  images:
-  server:
-    repository: harishdell/els-lmsserver
-    tag: "1.12.0"  # ← CI updates this
+  deploymentType: "client"
   client:
-    repository: harishdell/els-lmsclient
-    tag: "1.6.0"   # ← CI updates this
-  
-  database:
-    secretName: "els-lms-postgres-app-credentials"
-    host: postgres-postgres
-    port: 5432
-    name: els_lms
-    username: postgres
-    password: postgres
+    name: "els-lms"
+    domain: "elslms.local"
+  imagePullPolicy: IfNotPresent
+  labels:
+    environment: "dev"
+    managedBy: "helm"
+  istio:
+    enabled: true
+    gateway:
+      name: els-lms-gateway
+    monitoring:
+      kiali:
+        enabled: true
+      prometheus:
+        enabled: true
+      grafana:
+        enabled: true
+      jaeger:
+        enabled: true
 
+# PostgreSQL Database
 postgres:
   enabled: true
-  
   image:
     repository: postgres
     tag: "15"
     pullPolicy: IfNotPresent
-
   auth:
     username: postgres
     password: postgres
-    database: els_lms
+    database: elsdb
     existingSecret: ""
-
   service:
     type: ClusterIP
     port: 5432
-
   persistence:
     enabled: true
     accessModes: ["ReadWriteOnce"]
     size: 2Gi
     storageClassName: "hostpath"
-
   resources:
     requests:
       cpu: 100m
@@ -53,73 +52,75 @@ postgres:
     limits:
       cpu: 500m
       memory: 512Mi
-
   readinessProbe:
     initialDelaySeconds: 10
     periodSeconds: 5
-
   livenessProbe:
     initialDelaySeconds: 30
     periodSeconds: 10
-elslmsserver:
+
+# ELS-LMS API (Backend)
+els-lms-api:
   enabled: true
-  name: els-lmsserver
-  image: "{{ .Values.global.images.server.repository }}"  # ← Reference global
-  tag: "{{ .Values.global.images.server.tag }}"           # ← Reference global
-  imagePullPolicy: "{{ .Values.global.imagePullPolicy }}"
-  containerPort: 1337
-  servicePort: 1337
-  replicaCount: 1
+  replicaCount: 2
+  image:
+    repository: harishdell/els-lmsserver
+    tag: "1.5.0"
+    pullPolicy: IfNotPresent
+  service:
+    name: els-lms-api
+    type: ClusterIP
+    port: 1337
+    targetPort: 1337
   env:
     HOST: "0.0.0.0"
     PORT: "1337"
     DATABASE_CLIENT: "postgres"
+    DATABASE_HOST: "els-lms-postgres-postgres"  # ← FIXED: Correct service name
     DATABASE_PORT: "5432"
-    DATABASE_NAME: "els_lms"     
+    DATABASE_NAME: "elsdb"
     DATABASE_USERNAME: "postgres"
     DATABASE_PASSWORD: "postgres"
-    CENTRALIZED_SERVER: "http://els-lmsserver.local"
-
-  ingress:
+    NODE_ENV: "production"
+  healthCheck:
     enabled: true
-    host: "els-lmsserver.local"
-    className: nginx
-    annotations:
-      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-      nginx.ingress.kubernetes.io/rewrite-target: /
-    tls: []
-elslmsclient:
+    path: "/_health"
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  ingress:
+    enabled: false  # Using Istio instead
+
+# ELS-LMS UI (Frontend)
+els-lms-ui:
   enabled: true
-  replicaCount: 1
-  name: els-lmsclient
-  image: "{{ .Values.global.images.client.repository }}"  # ← Reference global
-  tag: "{{ .Values.global.images.client.tag }}"           # ← Reference global
-  imagePullPolicy: "{{ .Values.global.imagePullPolicy }}" # ← Fix from Never
-  containerPort: 80
-  servicePort: 80
-    
+  replicaCount: 2
+  image:
+    repository: harishdell/els-lms-ui
+    tag: "1.6.0"
+    pullPolicy: IfNotPresent
+  service:
+    name: els-lms-ui
+    type: ClusterIP
+    port: 80
+    targetPort: 80
   env:
+    REACT_APP_API_URL: "http://elslms.local/lmsserver/api"  # ← Correct path
     REACT_APP_ABLY_API_KEY: "xul13A.CNpeww:KkS0rh8M4rJSr5r4gHNGbMijYuxvr90ybz1UQd6uKpw"
     REACT_APP_MAXPAGE: "3"
-    REACT_APP_KRUTRIM_API_KEY: "5MG974Dkz5xHQ70hLzyLZQzMO57B5P9Pos1MOYe3"
-    REACT_APP_GOOGLE_API_KEY: "AIzaSyDNN9LVrNB_WOGhrHG0U1CYsTWIOuaaoI8"
-    REACT_APP_PINCODE: "https://emeelan.com/alumniserver/api"
-    REACT_APP_API_URL: "http://els-lmsserver.local/api"
-
+    REACT_APP_GOOGLE_API_KEY: "REDACTED"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
   ingress:
-    enabled: true
-    name: els-lmsclient-ingress
-    className: nginx
-    host: els-lmsclient.local 
-
-    rules:
-      - host: els-lmsclient.local  # ← ADD THIS
-        http:
-          paths:
-            - path: /
-              pathType: Prefix
-              backend:
-                service:
-                  name: els-lmsclient-service
-                  port:
-                    number: 80
+    enabled: false  # Using Istio instead
