@@ -6,10 +6,11 @@ elslmsserver:
   imagePullPolicy: IfNotPresent
   containerPort: 1337
   servicePort: 1337
-
+  
   env:
     HOST: "0.0.0.0"
     PORT: "1337"
+    DATABASE_HOST: "els-lms-postgres-postgres"  # ✅ Correct service name
     DATABASE_CLIENT: "postgres"
     DATABASE_PORT: "5432"
     DATABASE_NAME: "els_lms"
