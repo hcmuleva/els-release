@@ -24,7 +24,6 @@ global:
         enabled: true
       jaeger:
         enabled: true
-
 # PostgreSQL Database
 postgres:
   enabled: true
@@ -58,14 +57,13 @@ postgres:
   livenessProbe:
     initialDelaySeconds: 30
     periodSeconds: 10
-
 # ELS-LMS API (Backend)
 els-lms-api:
   enabled: true
   replicaCount: 2
   image:
     repository: harishdell/els-lmsserver
-    tag: "1.5.0"
+    tag: "1.13.0"
     pullPolicy: IfNotPresent
   service:
     name: els-lms-api
@@ -76,7 +74,7 @@ els-lms-api:
     HOST: "0.0.0.0"
     PORT: "1337"
     DATABASE_CLIENT: "postgres"
-    DATABASE_HOST: "els-lms-postgres-postgres"  # ← FIXED: Correct service name
+    DATABASE_HOST: "els-lms-postgres-postgres" # ← FIXED: Correct service name
     DATABASE_PORT: "5432"
     DATABASE_NAME: "elsdb"
     DATABASE_USERNAME: "postgres"
@@ -95,8 +93,7 @@ els-lms-api:
       cpu: 1000m
       memory: 2Gi
   ingress:
-    enabled: false  # Using Istio instead
-
+    enabled: false # Using Istio instead
 # ELS-LMS UI (Frontend)
 els-lms-ui:
   enabled: true
@@ -111,7 +108,7 @@ els-lms-ui:
     port: 80
     targetPort: 80
   env:
-    REACT_APP_API_URL: "http://elslms.local/lmsserver/api"  # ← Correct path
+    REACT_APP_API_URL: "http://elslms.local/lmsserver/api" # ← Correct path
     REACT_APP_ABLY_API_KEY: "xul13A.CNpeww:KkS0rh8M4rJSr5r4gHNGbMijYuxvr90ybz1UQd6uKpw"
     REACT_APP_MAXPAGE: "3"
     REACT_APP_GOOGLE_API_KEY: "REDACTED"
@@ -123,4 +120,4 @@ els-lms-ui:
       cpu: 200m
       memory: 256Mi
   ingress:
-    enabled: false  # Using Istio instead
+    enabled: false # Using Istio instead
