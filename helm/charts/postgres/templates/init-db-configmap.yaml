@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "postgres.fullname" . }}-init-script
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+  labels:
+    {{- include "postgres.labels" . | nindent 4 }}
+data:
+  01-create-database.sql: |
+    -- Create the main application database
+    CREATE DATABASE els_lms;
+    
+    -- Grant all privileges to the postgres user
+    GRANT ALL PRIVILEGES ON DATABASE els_lms TO postgres;
+    
+    -- Create additional users if needed (optional)
+    -- CREATE USER postgres WITH PASSWORD 'postgres';
+    -- GRANT ALL PRIVILEGES ON DATABASE els_lms TO postgres;

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.elslmsclient.name }}-deployment
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"  # ← Deploy last
+  labels:
+    app: {{ .Values.elslmsclient.name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.elslmsclient.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.elslmsclient.name }}
+    spec:
+      containers:
+      - name: {{ .Values.elslmsclient.name }}
+        image: "{{ .Values.elslmsclient.image }}:{{ .Values.elslmsclient.tag }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        env:
+        {{- range $key, $value := .Values.elslmsclient.env }}
+        - name: {{ $key }}
+          value: "{{ $value }}"
+        {{- end }}
+        ports:
+          - containerPort: {{ .Values.elslmsclient.containerPort }}
