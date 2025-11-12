@@ -19,7 +19,7 @@ elslmsclient:
     REACT_APP_KRUTRIM_API_KEY: 5MG974Dkz5xHQ70hLzyLZQzMO57B5P9Pos1MOYe3
     REACT_APP_GOOGLE_API_KEY: AIzaSyDNN9LVrNB_WOGhrHG0U1CYsTWIOuaaoI8
     REACT_APP_PINCODE: https://emeelan.com/alumniserver/api
-    REACT_APP_API_URL: http://els-lmsserver.local/api   
+    REACT_APP_API_URL: http://els-lmsserver.local
 
 # ===========================================
 # Ingress configuration
@@ -27,6 +27,7 @@ elslmsclient:
 ingress:
   enabled: true
   name: els-lmsclient-ingress
+  host: els-lmsclient.local
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /

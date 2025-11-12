@@ -11,7 +11,7 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
-  - host: els-lmsclient.local
+  - host: {{ .Values.ingress.host }}
     http:
       paths:
       {{- range .Values.ingress.paths }}
