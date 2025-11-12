@@ -157,41 +157,47 @@ jobs:
           docker push $DOCKER_ORG/els-lmsserver:$VERSION
           docker push $DOCKER_ORG/els-lmsserver:latest
 
+  
   deploy-helm:
     name: Deploy Helm Chart
     runs-on: ubuntu-latest
     needs: [build-lmsclient, build-lmsserver, determine-environment]
     if: |
       (needs.build-lmsclient.result == 'success' || needs.build-lmsserver.result == 'success') &&
-      (needs.detect-changes.outputs.lmsclient == 'true' || needs.detect-changes.outputs.lmsserver == 'true') &&
       github.ref == 'refs/heads/main'
-     
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+      uses: azure/setup-helm@v4
+
       - name: Deploy updated charts
-        run: |
-          VERSION=$(cat VERSION 2>/dev/null || echo "latest")
-          ENV_FILE=${{ needs.determine-environment.outputs.env_file }}
+      run: |
+        VERSION=$(cat VERSION 2>/dev/null || echo "latest")
+        ENV_FILE=${{ needs.determine-environment.outputs.env_file }}
 
-          if [ "${{ needs.build-lmsclient.result }}" == "success" ]; then
-            echo "🚀 Deploying els-lmsclient Helm chart"
-            helm upgrade --install els-lmsclient \
-              $HELM_BASE/els-lmsclient \
-              -f $HELM_BASE/els-lmsclient/${ENV_FILE} \
-              --set image.tag=$VERSION \
-              --namespace els-lms --create-namespace
-          fi
+        echo "📦 Using environment file: $ENV_FILE"
+        echo "📦 Using image tag: $VERSION"
 
-          if [ "${{ needs.build-lmsserver.result }}" == "success" ]; then
-            echo "🚀 Deploying els-lmsserver Helm chart"
-            helm upgrade --install els-lmsserver \
-              $HELM_BASE/els-lmsserver \
-              -f $HELM_BASE/els-lmsserver/${ENV_FILE} \
-              --set image.tag=$VERSION \
-              --namespace els-lms --create-namespace
-          fi
+        # Deploy client
+        if [ "${{ needs.build-lmsclient.result }}" == "success" ]; then
+          echo "🚀 Deploying els-lmsclient Helm chart"
+          helm upgrade --install els-lmsclient \
+            $HELM_BASE/els-lmsclient \
+            -f $HELM_BASE/els-lmsclient/${ENV_FILE} \
+            --set image.tag=$VERSION \
+            --namespace els-lms --create-namespace
+        fi
+
+        # Deploy server
+        if [ "${{ needs.build-lmsserver.result }}" == "success" ]; then
+          echo "🚀 Deploying els-lmsserver Helm chart"
+          helm upgrade --install els-lmsserver \
+            $HELM_BASE/els-lmsserver \
+            -f $HELM_BASE/els-lmsserver/${ENV_FILE} \
+            --set image.tag=$VERSION \
+            --namespace els-lms --create-namespace
+        fi
 
   ci-success:
     name: CI Success
