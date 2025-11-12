@@ -9,34 +9,22 @@ keywords:
   - lms
   - els-lms
   - full-stack
-  - react
-  - strapi
-  - postgres
 
 maintainers:
   - name: DevOps Team
-    email: devops@els-lms.local
 
 dependencies:
   - name: postgres
     version: "1.0.0"
     repository: "file://./charts/postgres"
     condition: postgres.enabled
-    tags:
-      - database
   
   - name: els-lmsserver
     version: "0.1.0"
     repository: "file://./charts/els-lmsserver"
     condition: els-lmsserver.enabled
-    tags:
-      - backend
-      - api
   
   - name: els-lmsclient
     version: "0.1.0"
     repository: "file://./charts/els-lmsclient"
     condition: els-lmsclient.enabled
-    tags:
-      - frontend
-      - ui

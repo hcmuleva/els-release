@@ -8,5 +8,5 @@ dependencies:
 - name: els-lmsclient
   repository: file://./charts/els-lmsclient
   version: 0.1.0
-digest: sha256:3b87843e437b664f6595f9bb2599bd08eba6018cfe058412a85cd37391f280cc
-generated: "2025-11-11T09:42:33.847998+05:30"
+digest: sha256:62f33d6d3ef570b5aac8338ffb508e2fc92c85429e85cf651d37d7e69aaa77c4
+generated: "2025-11-11T16:10:41.269561+05:30"

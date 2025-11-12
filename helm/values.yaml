@@ -1,30 +1,8 @@
 # ============================================
-# ELS-LMS Stack - Base Configuration
+# ELS-LMS Stack - Simplified Configuration
 # ============================================
 
-global:
-  deploymentType: "client"
-  client:
-    name: "els-lms"
-    domain: "elslms.local"
-  imagePullPolicy: IfNotPresent
-  labels:
-    environment: "dev"
-    managedBy: "helm"
-  istio:
-    enabled: true
-    gateway:
-      name: els-lms-gateway
-    monitoring:
-      kiali:
-        enabled: true
-      prometheus:
-        enabled: true
-      grafana:
-        enabled: true
-      jaeger:
-        enabled: true
-# PostgreSQL Database
+# PostgreSQL Database Configuration
 postgres:
   enabled: true
   image:
@@ -34,7 +12,7 @@ postgres:
   auth:
     username: postgres
     password: postgres
-    database: elsdb
+    database: els_lms
     existingSecret: ""
   service:
     type: ClusterIP
@@ -42,7 +20,7 @@ postgres:
   persistence:
     enabled: true
     accessModes: ["ReadWriteOnce"]
-    size: 2Gi
+    size: 1Gi
     storageClassName: "hostpath"
   resources:
     requests:
@@ -57,67 +35,65 @@ postgres:
   livenessProbe:
     initialDelaySeconds: 30
     periodSeconds: 10
-# ELS-LMS API (Backend)
-els-lms-api:
+
+# Backend API Server Configuration
+els-lmsserver:
   enabled: true
-  replicaCount: 2
-  image:
-    repository: harishdell/els-lmsserver
-    tag: "1.13.0"
-    pullPolicy: IfNotPresent
-  service:
-    name: els-lms-api
-    type: ClusterIP
-    port: 1337
-    targetPort: 1337
-  env:
-    HOST: "0.0.0.0"
-    PORT: "1337"
-    DATABASE_CLIENT: "postgres"
-    DATABASE_HOST: "els-lms-postgres" # ← FIXED: Correct service name
-    DATABASE_PORT: "5432"
-    DATABASE_NAME: "elsdb"
-    DATABASE_USERNAME: "postgres"
-    DATABASE_PASSWORD: "postgres"
-    NODE_ENV: "production"
-  healthCheck:
+  elslmsserver:
     enabled: true
-    path: "/_health"
-    initialDelaySeconds: 30
-    periodSeconds: 10
-  resources:
-    requests:
-      cpu: 250m
-      memory: 1Gi
-    limits:
-      cpu: 1000m
-      memory: 2Gi
+    name: els-lmsserver
+    # image:  harishdell/templeserver
+    # tag: "1.12"  # ← CI updates this
+    image: harishdell/els-lmsserver
+    tag: "1.15.0"
+    imagePullPolicy: IfNotPresent
+    containerPort: 1337
+    servicePort: 1337
+    env:
+      HOST: "0.0.0.0"
+      PORT: "1337"
+      DATABASE_HOST: "els-lms-postgres"
+      DATABASE_CLIENT: "postgres"
+      DATABASE_PORT: "5432"
+      DATABASE_NAME: "elslms"
+      DATABASE_USERNAME: "postgres"
+      DATABASE_PASSWORD: "postgres"
+      #CENTRALIZED_SERVER: "http://els-lmsserver.local"
+      PUBLIC_URL: "http://els-lmsserver.local"
   ingress:
-    enabled: false # Using Istio instead
-# ELS-LMS UI (Frontend)
-els-lms-ui:
+    enabled: true
+    host: "els-lmsserver.local"
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/rewrite-target: /
+
+# Frontend Client Configuration
+els-lmsclient:
   enabled: true
-  replicaCount: 2
-  image:
-    repository: harishdell/els-lms-ui
-    tag: "1.6.0"
-    pullPolicy: IfNotPresent
-  service:
-    name: els-lms-ui
-    type: ClusterIP
-    port: 80
-    targetPort: 80
-  env:
-    REACT_APP_API_URL: "http://elslms.local/lmsserver/api" # ← Correct path
-    REACT_APP_ABLY_API_KEY: "xul13A.CNpeww:KkS0rh8M4rJSr5r4gHNGbMijYuxvr90ybz1UQd6uKpw"
-    REACT_APP_MAXPAGE: "3"
-    REACT_APP_GOOGLE_API_KEY: "REDACTED"
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
+  replicaCount: 1
+  imagePullPolicy: IfNotPresent
+  elslmsclient:
+    name: els-lmsclient
+    image: harishdell/els-lmsclient
+    tag: "1.8"
+    containerPort: 80
+    servicePort: 80
+    env:
+      REACT_APP_ABLY_API_KEY: xul13A.CNpeww:KkS0rh8M4rJSr5r4gHNGbMijYuxvr90ybz1UQd6uKpw
+      REACT_APP_MAXPAGE: "3"
+      REACT_APP_KRUTRIM_API_KEY: 5MG974Dkz5xHQ70hLzyLZQzMO57B5P9Pos1MOYe3
+      REACT_APP_GOOGLE_API_KEY: AIzaSyDNN9LVrNB_WOGhrHG0U1CYsTWIOuaaoI8
+      REACT_APP_PINCODE: https://emeelan.com/alumniserver/api
+      REACT_APP_API_URL: http://els-lmsserver.local/api
   ingress:
-    enabled: false # Using Istio instead
+    enabled: true
+    name: els-lmsclient-ingress
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    paths:
+      - path: /
+        pathType: Prefix
+        service: els-lmsclient-service
+        port: 80
