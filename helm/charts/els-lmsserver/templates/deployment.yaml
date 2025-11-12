@@ -39,22 +39,11 @@ spec:
         - name: {{ .Values.elslmsserver.name }}
           image: "{{ .Values.elslmsserver.image }}:{{ .Values.elslmsserver.tag }}"
           imagePullPolicy: {{ .Values.elslmsserver.imagePullPolicy }}
-          envFrom:
-            - secretRef:
-                name: {{ .Values.global.database.secretName }}  # ← Reference global value
           env:
           {{- range $key, $value := .Values.elslmsserver.env }}
             - name: {{ $key }}
               value: "{{ $value }}"
           {{- end }}
-            - name: DATABASE_HOST
-              value: "els-lms-postgres"
-            - name: DATABASE_NAME
-              value: "{{ .Values.global.database.name }}"
-            - name: DATABASE_USERNAME
-              value: "{{ .Values.global.database.username }}"
-            - name: DATABASE_PASSWORD
-              value: "{{ .Values.global.database.password }}"
           ports:
             - containerPort: {{ .Values.elslmsserver.containerPort }}
           readinessProbe:
