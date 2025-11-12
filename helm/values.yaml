@@ -35,7 +35,6 @@ postgres:
   livenessProbe:
     initialDelaySeconds: 30
     periodSeconds: 10
-
 # Backend API Server Configuration
 els-lmsserver:
   enabled: true
@@ -67,7 +66,6 @@ els-lmsserver:
     annotations:
       nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
       nginx.ingress.kubernetes.io/rewrite-target: /
-
 # Frontend Client Configuration
 els-lmsclient:
   enabled: true
@@ -97,3 +95,6 @@ els-lmsclient:
         pathType: Prefix
         service: els-lmsclient-service
         port: 80
+els-lms-api:
+  image:
+    tag: 1.13.2
