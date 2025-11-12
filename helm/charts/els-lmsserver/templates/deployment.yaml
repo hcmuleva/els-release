@@ -4,11 +4,11 @@ kind: Deployment
 metadata:
   name: {{ .Values.elslmsserver.name }}
   annotations:
-    argocd.argoproj.io/sync-wave: "2"  # ← Deploy after DB
+    argocd.argoproj.io/sync-wave: "2"  # optional — can remove if DB is external
   labels:
     app: {{ .Values.elslmsserver.name }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.elslmsserver.replicaCount | default 1 }}
   selector:
     matchLabels:
       app: {{ .Values.elslmsserver.name }}
@@ -17,24 +17,6 @@ spec:
       labels:
         app: {{ .Values.elslmsserver.name }}
     spec:
-      initContainers:
-        - name: wait-for-postgres
-          image: busybox:1.36
-          env:
-            - name: PGHOST
-              value: "els-lms-postgres"
-            - name: PGPORT
-              value: "5432"
-          command:
-            - sh
-            - -c
-            - |
-              echo "Waiting for PostgreSQL at ${PGHOST}:${PGPORT}..."
-              until nc -z ${PGHOST} ${PGPORT}; do
-                echo "PostgreSQL is unavailable - sleeping"
-                sleep 2
-              done
-              echo "PostgreSQL is ready!"
       containers:
         - name: {{ .Values.elslmsserver.name }}
           image: "{{ .Values.elslmsserver.image }}:{{ .Values.elslmsserver.tag }}"

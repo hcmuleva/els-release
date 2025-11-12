@@ -1,125 +1,67 @@
 import API from '../api';
 
 const examService = {
-  // Get all exams
-  getAllExams: async (filters = {}) => {
+  async getAllExams(filters = {}) {
     const params = new URLSearchParams();
-    
+
     if (filters.subject) params.append('filters[subject][id][$eq]', filters.subject);
     if (filters.course) params.append('filters[course][id][$eq]', filters.course);
     if (filters.examType) params.append('filters[examType][$eq]', filters.examType);
-    
-    // Populate questions
+
     params.append('populate[questions]', '*');
-    
-    // Populate course with specific fields only (avoid media fields)
-    params.append('populate[course][fields][0]', 'id');
-    params.append('populate[course][fields][1]', 'name');
-    params.append('populate[course][fields][2]', 'subtitle');
-    params.append('populate[course][fields][3]', 'description');
-    
-    // Populate subject with specific fields only
-    params.append('populate[subject][fields][0]', 'id');
-    params.append('populate[subject][fields][1]', 'name');
-    params.append('populate[subject][fields][2]', 'subtitle');
-    params.append('populate[subject][fields][3]', 'description');
-    
-    // Populate exam attempts
+    params.append('populate[course]', 'id,name,subtitle,description');
+    params.append('populate[subject]', 'id,name,subtitle,description');
     params.append('populate[examAttempts]', '*');
-    
-    const response = await API.get(`/api/exams?${params.toString()}`);
+
+    const response = await API.get(`/exams?${params.toString()}`);
     return response.data;
   },
 
-  // Get single exam
-  getExam: async (id) => {
+  async getExam(id) {
     const params = new URLSearchParams();
-    
-    // Populate questions
     params.append('populate[questions]', '*');
-    
-    // Populate course with specific fields
-    params.append('populate[course][fields][0]', 'id');
-    params.append('populate[course][fields][1]', 'name');
-    params.append('populate[course][fields][2]', 'subtitle');
-    params.append('populate[course][fields][3]', 'description');
-    
-    // Populate subject with specific fields
-    params.append('populate[subject][fields][0]', 'id');
-    params.append('populate[subject][fields][1]', 'name');
-    params.append('populate[subject][fields][2]', 'subtitle');
-    params.append('populate[subject][fields][3]', 'description');
-    
-    // Populate exam attempts
+    params.append('populate[course]', 'id,name,subtitle,description');
+    params.append('populate[subject]', 'id,name,subtitle,description');
     params.append('populate[examAttempts]', '*');
-    
-    const response = await API.get(`/api/exams/${id}?${params.toString()}`);
+    const response = await API.get(`/exams/${id}?${params.toString()}`);
     return response.data;
   },
 
-  // Create exam
-  createExam: async (examData) => {
-    const response = await API.post('/api/exams', {
-      data: examData
-    });
+  async createExam(examData) {
+    const response = await API.post('/exams', { data: examData });
     return response.data;
   },
 
-  // Update exam
-  updateExam: async (id, examData) => {
-    const response = await API.put(`/api/exams/${id}`, {
-      data: examData
-    });
+  async updateExam(id, examData) {
+    const response = await API.put(`/exams/${id}`, { data: examData });
     return response.data;
   },
 
-  // Delete exam
-  deleteExam: async (id) => {
-    const response = await API.delete(`/api/exams/${id}`);
+  async deleteExam(id) {
+    const response = await API.delete(`/exams/${id}`);
     return response.data;
   },
 
-  // Get exams by course
-  getExamsByCourse: async (courseId) => {
-    const params = new URLSearchParams();
-    params.append('filters[course][id][$eq]', courseId);
-    params.append('populate[questions]', '*');
-    params.append('populate[course][fields][0]', 'id');
-    params.append('populate[course][fields][1]', 'name');
-    params.append('populate[subject][fields][0]', 'id');
-    params.append('populate[subject][fields][1]', 'name');
-    
-    const response = await API.get(`/api/exams?${params.toString()}`);
+  async getExamsByCourse(courseId) {
+    const response = await API.get(
+      `/exams?filters[course][id][$eq]=${courseId}&populate=*`
+    );
     return response.data;
   },
 
-  // Get exams by subject
-  getExamsBySubject: async (subjectId) => {
-    const params = new URLSearchParams();
-    params.append('filters[subject][id][$eq]', subjectId);
-    params.append('populate[questions]', '*');
-    params.append('populate[course][fields][0]', 'id');
-    params.append('populate[course][fields][1]', 'name');
-    params.append('populate[subject][fields][0]', 'id');
-    params.append('populate[subject][fields][1]', 'name');
-    
-    const response = await API.get(`/api/exams?${params.toString()}`);
+  async getExamsBySubject(subjectId) {
+    const response = await API.get(
+      `/exams?filters[subject][id][$eq]=${subjectId}&populate=*`
+    );
     return response.data;
   },
 
-  // Get exam attempts for an exam
-  getExamAttempts: async (examId) => {
-    const params = new URLSearchParams();
-    params.append('filters[exam][id][$eq]', examId);
-    params.append('populate[student][fields][0]', 'id');
-    params.append('populate[student][fields][1]', 'username');
-    params.append('populate[student][fields][2]', 'email');
-    params.append('populate[exam][fields][0]', 'id');
-    params.append('populate[exam][fields][1]', 'title');
-    
-    const response = await API.get(`/api/exam-attempts?${params.toString()}`);
+  async getExamAttempts(examId) {
+    const response = await API.get(
+      `/exam-attempts?filters[exam][id][$eq]=${examId}&populate=*`
+    );
     return response.data;
-  }
+  },
 };
 
 export default examService;
