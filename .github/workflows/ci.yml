@@ -39,10 +39,10 @@ jobs:
         with:
           filters: |
             lmsclient:
-              - 'developer/els-lmsclient/**'
+              - 'developer/lmsclient/**'
               - 'helm/charts/els-lmsclient/**'
             lmsserver:
-              - 'developer/els-lmsserver/**'
+              - 'developer/lmsserver/**'
               - 'helm/charts/els-lmsserver/**'
             helm:
               - 'helm/**'
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: |
           echo "🧪 Running els-lmsclient tests..."
-          # cd developer/els-lmsclient && npm install && npm test
+          # cd developer/lmsclient && npm install && npm test
 
   test-lmsserver:
     name: Test LMS Server
@@ -109,7 +109,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: |
           echo "🧪 Running els-lmsserver tests..."
-          # cd developer/els-lmsserver && npm install && npm test
+          # cd developer/lmsserver && npm install && npm test
 
   build-lmsclient:
     name: Build & Push LMS Client
@@ -133,7 +133,7 @@ jobs:
           docker build \
             -t $DOCKER_ORG/els-lmsclient:$VERSION \
             -t $DOCKER_ORG/els-lmsclient:latest \
-            ./developer/els-lmsclient
+            ./developer/lmsclient
 
           docker push $DOCKER_ORG/els-lmsclient:$VERSION
           docker push $DOCKER_ORG/els-lmsclient:latest
@@ -153,7 +153,7 @@ jobs:
       - run: |
           VERSION=$(cat VERSION 2>/dev/null || echo "latest")
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          docker build -t $DOCKER_ORG/els-lmsserver:$VERSION -t $DOCKER_ORG/els-lmsserver:latest ./developer/els-lmsserver
+          docker build -t $DOCKER_ORG/els-lmsserver:$VERSION -t $DOCKER_ORG/els-lmsserver:latest ./developer/lmsserver
           docker push $DOCKER_ORG/els-lmsserver:$VERSION
           docker push $DOCKER_ORG/els-lmsserver:latest
 
@@ -163,7 +163,9 @@ jobs:
     needs: [build-lmsclient, build-lmsserver, determine-environment]
     if: |
       (needs.build-lmsclient.result == 'success' || needs.build-lmsserver.result == 'success') &&
+      (needs.detect-changes.outputs.lmsclient == 'true' || needs.detect-changes.outputs.lmsserver == 'true') &&
       github.ref == 'refs/heads/main'
+     
     steps:
       - uses: actions/checkout@v4
       - name: Set up Helm
