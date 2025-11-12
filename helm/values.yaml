@@ -60,6 +60,8 @@ els-lmsserver:
       DATABASE_PASSWORD: "postgres"
       #CENTRALIZED_SERVER: "http://els-lmsserver.local"
       PUBLIC_URL: "http://els-lmsserver.local"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,els-lmsserver.local,elslms.local,els-lms-api.local,els-lms-ui.local"
+
   ingress:
     enabled: true
     host: "els-lmsserver.local"
