@@ -1,145 +1,50 @@
 import API from '../api';
 
-/**
- * Subject Service for Strapi v5 API
- * Handles CRUD operations for subjects within courses
- */
-
 const subjectService = {
-  /**
-   * Get all subjects with optional filters
-   * @param {Object} params - Query parameters (page, pageSize, filters, or custom params)
-   * @returns {Promise} - Subjects list with metadata
-   */
   async getAllSubjects(params = {}) {
-    try {
-      // If custom filter params are passed (like filters[course][id][$eq]), use them directly
-      if (Object.keys(params).some(key => key.startsWith('filters['))) {
-        const response = await API.get('/api/subjects', { params });
-        return response.data.data; // Return the data array from Strapi v5 response
-      }
-      
-      // Otherwise use legacy format
-      const { page = 1, pageSize = 100, courseId = null } = params;
-      
-      let queryString = `?populate=*&pagination[page]=${page}&pagination[pageSize]=${pageSize}`;
-      
-      // Filter by course if provided
-      if (courseId) {
-        queryString += `&filters[course][documentId][$eq]=${courseId}`;
-      }
-      
-      const response = await API.get(`/api/subjects${queryString}`);
-      return response.data.data; // Return the data array from Strapi v5 response
-    } catch (error) {
-      console.error('Error fetching subjects:', error);
-      throw error;
-    }
+    const { page = 1, pageSize = 100, courseId = null } = params;
+    let query = `?populate=*&pagination[page]=${page}&pagination[pageSize]=${pageSize}`;
+
+    if (courseId) query += `&filters[course][documentId][$eq]=${courseId}`;
+    const response = await API.get(`/subjects${query}`);
+    return response.data.data;
   },
 
-  /**
-   * Get subjects for a specific course
-   * @param {string} courseDocumentId - Course document ID
-   * @returns {Promise} - Subjects list
-   */
   async getSubjectsByCourse(courseDocumentId) {
-    try {
-      const response = await API.get(
-        `/api/subjects?filters[course][documentId][$eq]=${courseDocumentId}&populate=*`
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching course subjects:', error);
-      throw error;
-    }
+    const response = await API.get(
+      `/subjects?filters[course][documentId][$eq]=${courseDocumentId}&populate=*`
+    );
+    return response.data;
   },
 
-  /**
-   * Get single subject by documentId
-   * @param {string} documentId - Subject document ID
-   * @returns {Promise} - Subject data
-   */
   async getSubjectById(documentId) {
-    try {
-      const response = await API.get(`/api/subjects/${documentId}?populate=*`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching subject:', error);
-      throw error;
-    }
+    const response = await API.get(`/subjects/${documentId}?populate=*`);
+    return response.data;
   },
 
-  /**
-   * Create new subject
-   * @param {Object} subjectData - Subject data
-   * @returns {Promise} - Created subject
-   */
   async createSubject(subjectData) {
-    try {
-      const response = await API.post('/api/subjects', {
-        data: subjectData
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error creating subject:', error);
-      throw error;
-    }
+    const response = await API.post('/subjects', { data: subjectData });
+    return response.data;
   },
 
-  /**
-   * Update subject by documentId
-   * @param {string} documentId - Subject document ID
-   * @param {Object} subjectData - Updated subject data
-   * @returns {Promise} - Updated subject
-   */
   async updateSubject(documentId, subjectData) {
-    try {
-      const response = await API.put(`/api/subjects/${documentId}`, {
-        data: subjectData
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error updating subject:', error);
-      throw error;
-    }
+    const response = await API.put(`/subjects/${documentId}`, { data: subjectData });
+    return response.data;
   },
 
-  /**
-   * Delete subject by documentId
-   * @param {string} documentId - Subject document ID
-   * @returns {Promise} - Deleted subject
-   */
   async deleteSubject(documentId) {
-    try {
-      const response = await API.delete(`/api/subjects/${documentId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error deleting subject:', error);
-      throw error;
-    }
+    const response = await API.delete(`/subjects/${documentId}`);
+    return response.data;
   },
 
-  /**
-   * Upload subject cover icon
-   * @param {File} file - Image file
-   * @returns {Promise} - Uploaded file data
-   */
   async uploadCoverIcon(file) {
-    try {
-      const formData = new FormData();
-      formData.append('files', file);
-
-      const response = await API.post('/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error uploading cover icon:', error);
-      throw error;
-    }
-  }
+    const formData = new FormData();
+    formData.append('files', file);
+    const response = await API.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };
 
 export default subjectService;

@@ -1,0 +1,30 @@
+elslmsserver:
+  enabled: true
+  name: els-lmsserver
+  image: harishdell/els-lmsserver
+  tag: "1.12.0"
+  imagePullPolicy: IfNotPresent
+  containerPort: 1337
+  servicePort: 1337
+  
+  env:
+    HOST: "0.0.0.0"
+    PORT: "1337"
+    DATABASE_HOST: "els-lms-postgres"  # ✅ Correct service name
+    DATABASE_CLIENT: "postgres"
+    DATABASE_PORT: "5432"
+    DATABASE_NAME: "els_lms"
+    DATABASE_USERNAME: "postgres"
+    DATABASE_PASSWORD: "postgres"
+    PUBLIC_URL: "http://els-lmsserver.local"
+    ALLOWED_HOSTS: "localhost,127.0.0.1,els-lmsserver.local,elslms.local,els-lms-api.local,els-lms-ui.local"
+
+
+ingress:
+  enabled: true
+  host: "els-lmsserver.local"
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  tls: []

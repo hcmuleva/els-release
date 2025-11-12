@@ -2,6 +2,9 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
 # Copy and install dependencies first for better caching
 COPY package.json package-lock.json ./
 RUN npm install
@@ -17,6 +20,8 @@ FROM nginx:stable-alpine
 
 # Copy built React app
 COPY --from=build /app/build /usr/share/nginx/html
+COPY env.sh /docker-entrypoint.d/00-env.sh
+RUN chmod +x /docker-entrypoint.d/00-env.sh
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf

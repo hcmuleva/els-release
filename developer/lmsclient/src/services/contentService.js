@@ -1,132 +1,56 @@
-import axios from 'axios';
-
-const API_URL = 'http://localhost:1337/api';
-
-const getAuthHeader = () => ({
-  headers: {
-    'Authorization': `Bearer ${localStorage.getItem('token')}`
-  }
-});
+import API from '../api';
 
 const contentService = {
-  // Get all contents with optional filters
-  getAllContents: async (params = {}) => {
-    try {
-      const response = await axios.get(`${API_URL}/contents`, {
-        ...getAuthHeader(),
-        params: {
-          populate: '*',
-          ...params
-        }
-      });
-      return response.data.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to fetch contents');
-    }
+  async getAllContents(params = {}) {
+    const response = await API.get('/contents', {
+      params: { populate: '*', ...params },
+    });
+    return response.data.data;
   },
 
-  // Get content by documentId
-  getContentById: async (documentId) => {
-    try {
-      const response = await axios.get(`${API_URL}/contents/${documentId}?populate=*`, getAuthHeader());
-      return response.data.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to fetch content');
-    }
+  async getContentById(documentId) {
+    const response = await API.get(`/contents/${documentId}?populate=*`);
+    return response.data.data;
   },
 
-  // Get contents by subject
-  getContentsBySubject: async (subjectId) => {
-    try {
-      const response = await axios.get(`${API_URL}/contents`, {
-        ...getAuthHeader(),
-        params: {
-          'filters[subject][id][$eq]': subjectId,
-          populate: '*'
-        }
-      });
-      return response.data.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to fetch subject contents');
-    }
+  async getContentsBySubject(subjectId) {
+    const response = await API.get('/contents', {
+      params: { 'filters[subject][id][$eq]': subjectId, populate: '*' },
+    });
+    return response.data.data;
   },
 
-  // Get contents by teacher
-  getContentsByTeacher: async (teacherId) => {
-    try {
-      const response = await axios.get(`${API_URL}/contents`, {
-        ...getAuthHeader(),
-        params: {
-          'filters[teacher][id][$eq]': teacherId,
-          populate: '*'
-        }
-      });
-      return response.data.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to fetch teacher contents');
-    }
+  async getContentsByTeacher(teacherId) {
+    const response = await API.get('/contents', {
+      params: { 'filters[teacher][id][$eq]': teacherId, populate: '*' },
+    });
+    return response.data.data;
   },
 
-  // Create new content
-  createContent: async (contentData) => {
-    try {
-      const response = await axios.post(
-        `${API_URL}/contents`,
-        { data: contentData },
-        getAuthHeader()
-      );
-      return response.data.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to create content');
-    }
+  async createContent(contentData) {
+    const response = await API.post('/contents', { data: contentData });
+    return response.data.data;
   },
 
-  // Update content by documentId
-  updateContent: async (documentId, contentData) => {
-    try {
-      const response = await axios.put(
-        `${API_URL}/contents/${documentId}`,
-        { data: contentData },
-        getAuthHeader()
-      );
-      return response.data.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to update content');
-    }
+  async updateContent(documentId, contentData) {
+    const response = await API.put(`/contents/${documentId}`, { data: contentData });
+    return response.data.data;
   },
 
-  // Delete content by documentId
-  deleteContent: async (documentId) => {
-    try {
-      await axios.delete(`${API_URL}/contents/${documentId}`, getAuthHeader());
-      return true;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to delete content');
-    }
+  async deleteContent(documentId) {
+    await API.delete(`/contents/${documentId}`);
+    return true;
   },
 
-  // Upload content attachment/media
-  uploadMedia: async (files) => {
-    try {
-      const formData = new FormData();
-      
-      if (Array.isArray(files)) {
-        files.forEach(file => formData.append('files', file));
-      } else {
-        formData.append('files', files);
-      }
+  async uploadMedia(files) {
+    const formData = new FormData();
+    (Array.isArray(files) ? files : [files]).forEach(f => formData.append('files', f));
 
-      const response = await axios.post(`${API_URL}/upload`, formData, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.error?.message || 'Failed to upload media');
-    }
-  }
+    const response = await API.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };
 
 export default contentService;
