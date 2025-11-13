@@ -11,7 +11,9 @@ import { AuthContext } from "./AuthContext";
 
 function App() {
   const { token } = useContext(AuthContext); // ✅ Use context instead of localStorage
-
+/** 
+ *  Modify for CI CD testing
+ */
   return (
     <Router>
       <Routes>
