@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
   // Login with Strapi API
   const login = async (identifier, password) => {
     try {
-      const response = await API.post("/api/auth/local", {
+      const response = await API.post("/auth/local", {
         identifier,
         password,
       });
@@ -69,7 +69,7 @@ export function AuthProvider({ children }) {
   // Register with Strapi API
   const register = async (username, email, password, userRole = "student") => {
     try {
-      const response = await API.post("/api/auth/local/register", {
+      const response = await API.post("/auth/local/register", {
         username,
         email,
         password,
