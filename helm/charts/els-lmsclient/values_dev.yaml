@@ -10,7 +10,7 @@ imagePullPolicy: IfNotPresent
 elslmsclient:
   name: els-lmsclient
   image: harishdell/els-lmsclient
-  tag: "1.1"
+  tag: "1.13.8-pr32"
   containerPort: 80
   servicePort: 80
   env:
