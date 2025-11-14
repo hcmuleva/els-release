@@ -1,0 +1,69 @@
+{{- if .Values.global.istio.enabled }}
+---
+# DestinationRule for LMS API
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: els-lms-api-destinationrule
+  namespace: {{ .Release.Namespace }}
+spec:
+  host: {{ index .Values "els-lms-api" "service" "name" | default "els-lms-api" }}
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 40
+
+---
+# DestinationRule for LMS UI
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: els-lms-ui-destinationrule
+  namespace: {{ .Release.Namespace }}
+spec:
+  host: {{ index .Values "els-lms-ui" "service" "name" | default "els-lms-ui" }}
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 40
+
+---
+# DestinationRule for PostgreSQL
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: postgres-destinationrule
+  namespace: {{ .Release.Namespace }}
+spec:
+  host: els-lms-postgres-postgres
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 50
+    loadBalancer:
+      simple: ROUND_ROBIN
+{{- end }}

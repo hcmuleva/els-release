@@ -1,0 +1,84 @@
+# ============================================
+# ELS-LMS Server Deployment Configuration
+# ============================================
+
+global:
+  deploymentType: "server"
+  client:
+    name: "server"
+    domain: "els-lms-server.local"
+  imagePullPolicy: IfNotPresent
+  labels:
+    environment: "server"
+    type: "centralized"
+
+postgres:
+  enabled: true
+  auth:
+    database: "elsdb_server"
+    username: "postgres"
+    password: "postgres"
+  persistence:
+    size: 50Gi
+    storageClassName: "standard"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+els-lms-api:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: harishdell/els-lmsserver
+    tag: "1.0"
+    pullPolicy: IfNotPresent
+  env:
+    HOST: "0.0.0.0"
+    PORT: "1337"
+    DATABASE_CLIENT: "postgres"
+    DATABASE_HOST: "els-lms-postgres"
+    DATABASE_PORT: "5432"
+    DATABASE_NAME: "elsdb_server"
+    DATABASE_USERNAME: "postgres"
+    DATABASE_PASSWORD: "postgres"
+    NODE_ENV: "production"
+    APP_MODE: "server"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  ingress:
+    enabled: true
+    className: nginx
+    host: "els-lms-server.local"
+
+els-lms-ui:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: harishdell/els-lmsserver
+    tag: "1.0"
+    pullPolicy: IfNotPresent
+  env:
+    REACT_APP_API_URL: "http://els-lms-server.local/api"
+    REACT_APP_ABLY_API_KEY: "xul13A.CNpeww:KkS0rh8M4rJSr5r4gHNGbMijYuxvr90ybz1UQd6uKpw"
+    REACT_APP_MAXPAGE: "10"
+    REACT_APP_MODE: "server"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  ingress:
+    enabled: true
+    className: nginx
+    host: "els-lms-server-ui.local"

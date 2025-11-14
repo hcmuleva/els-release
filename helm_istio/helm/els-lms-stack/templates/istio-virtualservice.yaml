@@ -1,0 +1,91 @@
+{{- if .Values.global.istio.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: els-lms-virtualservice
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: els-lms
+    environment: {{ .Values.global.labels.environment }}
+spec:
+  hosts:
+    - "{{ .Values.global.domain | default "elslms.local" }}"
+    {{- if and (.Values.global.domain) (ne .Values.global.domain "elslms.local") }}
+    - "elslms.local"
+    {{- end }}
+  gateways:
+    - {{ .Values.global.istio.gateway.name | default "els-lms-gateway" }}
+
+  http:
+  # Route for LMS Server API (with trailing slash handling)
+  - match:
+    - uri:
+        prefix: /lmsserver/
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: {{ index .Values "els-lms-api" "service" "name" | default "els-lms-api" }}
+        port:
+          number: {{ index .Values "els-lms-api" "service" "port" | default "els-lms-api" }}
+    corsPolicy:
+      allowOrigins:
+      - regex: ".*"
+      allowMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+      - PATCH
+      allowHeaders:
+      - "*"
+      allowCredentials: true
+    timeout: 60s
+    retries:
+      attempts: 3
+      perTryTimeout: 20s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+  
+  # Route for LMS Server API (without trailing slash)
+  - match:
+    - uri:
+        exact: /lmsserver
+    redirect:
+      uri: /lmsserver/
+  
+  # Route for LMS Client UI (with trailing slash handling)  
+  - match:
+    - uri:
+        prefix: /lmsclient/
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: {{ index .Values "els-lms-ui" "service" "name" | default "els-lms-ui" }}
+        port:
+          number: {{ index .Values "els-lms-ui" "service" "port" | default 80 }}
+        
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+  
+  # Route for LMS Client UI (without trailing slash)
+  - match:
+    - uri:
+        exact: /lmsclient
+    redirect:
+      uri: /lmsclient/
+  
+  # Default route to UI homepage
+  - match:
+    - uri:
+        exact: /
+    route:
+    - destination:
+        host: {{ index .Values "els-lms-ui" "service" "name" | default "els-lms-ui" }}
+        port:
+          number: {{ index .Values "els-lms-ui" "service" "port" | default 80 }}
+        
+{{- end }}

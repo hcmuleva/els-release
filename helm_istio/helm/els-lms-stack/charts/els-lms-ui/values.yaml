@@ -1,0 +1,32 @@
+replicaCount: 1
+
+image:
+  repository: harishdell/els-lms-ui
+  tag: "1.1"
+  pullPolicy: IfNotPresent
+
+service:
+  name: els-lms-ui
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+env:
+  REACT_APP_API_URL: "http://els-lms-api.local/api"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: "els-lms-ui.local"
+  annotations: {}
+  paths:
+    - path: /
+      pathType: Prefix
