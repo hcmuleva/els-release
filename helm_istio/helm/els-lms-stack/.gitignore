@@ -1,0 +1,17 @@
+# Helm
+charts/*.tgz
+*.lock
+Chart.lock
+
+# Kubernetes
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

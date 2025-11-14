@@ -1,0 +1,126 @@
+# ============================================
+# ELS-LMS Stack - Base Configuration
+# ============================================
+
+global:
+  deploymentType: "client"
+  client:
+    name: "els-lms"
+    domain: "elslms.local"
+  imagePullPolicy: IfNotPresent
+  labels:
+    environment: "dev"
+    managedBy: "helm"
+  istio:
+    enabled: true
+    gateway:
+      name: els-lms-gateway
+    monitoring:
+      kiali:
+        enabled: true
+      prometheus:
+        enabled: true
+      grafana:
+        enabled: true
+      jaeger:
+        enabled: true
+
+# PostgreSQL Database
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15"
+    pullPolicy: IfNotPresent
+  auth:
+    username: postgres
+    password: postgres
+    database: elsdb
+    existingSecret: ""
+  service:
+    type: ClusterIP
+    port: 5432
+  persistence:
+    enabled: true
+    accessModes: ["ReadWriteOnce"]
+    size: 2Gi
+    storageClassName: "hostpath"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# ELS-LMS API (Backend)
+els-lms-api:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: harishdell/els-lmsserver
+    tag: "1.5.0"
+    pullPolicy: IfNotPresent
+  service:
+    name: els-lms-api
+    type: ClusterIP
+    port: 1337
+    targetPort: 1337
+  env:
+    HOST: "0.0.0.0"
+    PORT: "1337"
+    DATABASE_CLIENT: "postgres"
+    DATABASE_HOST: "els-lms-postgres-postgres"  # ← FIXED: Correct service name
+    DATABASE_PORT: "5432"
+    DATABASE_NAME: "elsdb"
+    DATABASE_USERNAME: "postgres"
+    DATABASE_PASSWORD: "postgres"
+    NODE_ENV: "production"
+  healthCheck:
+    enabled: true
+    path: "/_health"
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  ingress:
+    enabled: false  # Using Istio instead
+
+# ELS-LMS UI (Frontend)
+els-lms-ui:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: harishdell/els-lms-ui
+    tag: "1.6.0"
+    pullPolicy: IfNotPresent
+  service:
+    name: els-lms-ui
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  env:
+    REACT_APP_API_URL: "http://elslms.local/lmsserver/api"  # ← Correct path
+    REACT_APP_ABLY_API_KEY: "xul13A.CNpeww:KkS0rh8M4rJSr5r4gHNGbMijYuxvr90ybz1UQd6uKpw"
+    REACT_APP_MAXPAGE: "3"
+    REACT_APP_GOOGLE_API_KEY: "REDACTED"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: false  # Using Istio instead

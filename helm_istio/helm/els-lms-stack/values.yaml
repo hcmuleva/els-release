@@ -1,0 +1,144 @@
+---
+# ============================================
+# ELS-LMS Stack - Base Configuration
+# ============================================
+
+global:
+  domain: "elslms.local" 
+  deploymentType: "client"
+  client:
+    name: "els-lms"
+    domain: "elslms.local"
+  imagePullPolicy: IfNotPresent
+  labels:
+    environment: "dev"
+    managedBy: "helm"
+  istio:
+    enabled: true
+    gateway:
+      name: els-lms-gateway
+    monitoring:
+      kiali:
+        enabled: true
+      prometheus:
+        enabled: true
+      grafana:
+        enabled: true
+      jaeger:
+        enabled: true
+
+# PostgreSQL Database
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15"
+    pullPolicy: IfNotPresent
+  auth:
+    username: postgres
+    password: postgres
+    database: elsdb
+    existingSecret: ""
+  service:
+    type: ClusterIP
+    port: 5432
+  persistence:
+    enabled: true
+    accessModes: ["ReadWriteOnce"]
+    size: 2Gi
+    storageClassName: "hostpath"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  livenessProbe:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# ELS-LMS API (Backend)
+els-lms-api:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: harishdell/els-lmsserver
+    tag: "1.2"
+    pullPolicy: IfNotPresent
+  service:
+    name: els-lms-api
+    type: ClusterIP
+    port: 1337
+    targetPort: 1337
+  env:
+    HOST: "0.0.0.0"
+    PORT: "1337"
+    DATABASE_CLIENT: "postgres"
+    DATABASE_HOST: "els-lms-postgres"
+    DATABASE_PORT: "5432"
+    DATABASE_NAME: "elsdb"
+    DATABASE_USERNAME: "postgres"
+    DATABASE_PASSWORD: "postgres"
+    NODE_ENV: "development"
+  healthCheck:
+    enabled: true
+    path: "/_health"
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  ingress:
+    enabled: false
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    hosts:
+      - host: elslms.local
+        paths:
+          - path: /lmsserver
+            pathType: Prefix
+    tls: []
+
+# ELS-LMS UI (Frontend)
+els-lms-ui:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: harishdell/els-lmsclient
+    tag: "1.1"
+    pullPolicy: IfNotPresent
+  service:
+    name: els-lms-ui
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  env:
+    REACT_APP_API_URL: "http://elslms.local/lmsserver/api"
+    REACT_APP_ABLY_API_KEY: ""
+    REACT_APP_MAXPAGE: "3"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  ingress:
+    enabled: false
+    className: nginx
+    host: "elslms.local"
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    paths:
+      - path: /lmsclient
+        pathType: Prefix

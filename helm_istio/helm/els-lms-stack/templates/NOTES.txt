@@ -1,0 +1,33 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    ELS-LMS DEPLOYMENT SUCCESSFUL                         ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+🎉 Your ELS-LMS Stack has been deployed successfully!
+
+📦 Deployed Components:
+  ✓ PostgreSQL Database
+  ✓ ELS-LMS API (Strapi)
+  ✓ ELS-LMS UI (React)
+
+🔗 Access URLs:
+{{- if eq .Values.global.deploymentType "server" }}
+  Frontend UI:  http://{{ .Values.global.client.domain }}
+  API Server:   http://{{ .Values.global.client.domain }}
+{{- else }}
+  Frontend UI:  http://{{ .Values.global.client.name }}.local
+  API Server:   http://{{ .Values.global.client.name }}-api.local
+{{- end }}
+
+📊 Check Deployment Status:
+  kubectl get all -n {{ .Release.Namespace }}
+
+⚠️ Important: Add to /etc/hosts (for local testing)
+{{- if eq .Values.global.deploymentType "server" }}
+  127.0.0.1 els-lms-server.local els-lms-server-ui.local
+{{- else }}
+  127.0.0.1 {{ .Values.global.client.name }}.local {{ .Values.global.client.name }}-api.local
+{{- end }}
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                          Happy Learning! 📚                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
