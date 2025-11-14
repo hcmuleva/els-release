@@ -10,7 +10,7 @@ imagePullPolicy: IfNotPresent
 elslmsclient:
   name: els-lmsclient
   image: harishdell/els-lmsclient
-  tag: "1.13.8-pr35"
+  tag: "1.13.9-pr37"
   containerPort: 80
   servicePort: 80
   env:
@@ -22,7 +22,7 @@ elslmsclient:
 ingress:
   enabled: true
   name: els-lmsclient-ingress
-  host: els-lmsclient.local
+  host: dev-els-lmsclient.local
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
