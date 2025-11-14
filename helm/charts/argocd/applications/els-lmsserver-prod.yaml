@@ -8,7 +8,7 @@ spec:
   project: default
   
   source:
-    repoURL: https://github.com/your-org/your-repo.git
+    repoURL:  https://github.com/hcmuleva/els-demo.git
     targetRevision: main
     path: helm/charts/els-lmsserver
     helm:
