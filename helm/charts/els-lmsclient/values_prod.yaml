@@ -22,7 +22,7 @@ elslmsclient:
 ingress:
   enabled: true
   name: els-lmsclient-ingress
-  host: els-lmsclient.local
+  host: prod-els-lmsclient.local
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
