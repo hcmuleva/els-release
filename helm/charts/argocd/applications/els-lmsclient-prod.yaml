@@ -1,0 +1,27 @@
+# argocd/applications/els-lmsclient-prod.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: els-lmsclient-prod
+  namespace: argocd
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/hcmuleva/els-demo.git
+    targetRevision: main
+    path: helm/charts/els-lmsclient
+    helm:
+      valueFiles:
+        - values_prod.yaml
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: els-lms-prod
+  
+  syncPolicy:
+    automated:
+      prune: false  # Manual approval for prod
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true

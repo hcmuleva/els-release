@@ -23,7 +23,7 @@ const getEnvVar = (key, fallback) => {
 // ✅ Resolve API URL priority: runtime > build > fallback
 const API_URL = getEnvVar(
   "REACT_APP_API_URL",
-  "http://localhost:1337/api"
+  "http://localhost:1337"
 );
 
 // Log final resolved URL
