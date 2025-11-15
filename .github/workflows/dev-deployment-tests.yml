@@ -1,22 +1,195 @@
+name: Dev Environment Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:  # Allows manual trigger for testing
+
+env:
+  ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+  ARGOCD_APP_NAME: els-lmsserver-dev  # Change to your ArgoCD app name
+  #DEV_URL: http://localhost:8081  # Change to your dev service URL
+  DEV_URL: http://dev-els-lmsserver.local/api
+
+jobs:
+  wait-for-deployment:
+    name: Wait for ArgoCD Deployment
+    runs-on: self-hosted  # IMPORTANT: Use self-hosted runner
+    outputs:
+      deployment-ready: ${{ steps.check-deployment.outputs.ready }}
+      deployment-status: ${{ steps.check-deployment.outputs.status }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install ArgoCD CLI (if not installed)
+        run: |
+          if ! command -v argocd &> /dev/null; then
+            echo "Installing ArgoCD CLI..."
+            curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+            chmod +x /tmp/argocd
+            sudo mv /tmp/argocd /usr/local/bin/
+          else
+            echo "ArgoCD CLI already installed"
+          fi
+          argocd version --client
+      
+      - name: Login to ArgoCD
+        run: |
+          echo "Logging into ArgoCD at ${{ env.ARGOCD_SERVER }}"
+          argocd login ${{ env.ARGOCD_SERVER }} \
+            --username ${{ secrets.ARGOCD_USERNAME }} \
+            --password ${{ secrets.ARGOCD_PASSWORD }} \
+            --insecure
+      
+      - name: Check Current App Status
+        run: |
+          echo "=== Current Application Status ==="
+          argocd app get ${{ env.ARGOCD_APP_NAME }} || echo "App not found or not accessible"
+      
+      - name: Wait for Sync and Health
+        id: check-deployment
+        run: |
+          echo "Waiting for ArgoCD to sync and deploy..."
+          echo "App Name: ${{ env.ARGOCD_APP_NAME }}"
+          
+          # Wait up to 10 minutes for deployment
+          timeout=600
+          elapsed=0
+          interval=10
+          
+          while [ $elapsed -lt $timeout ]; do
+            echo "--- Check at ${elapsed}s ---"
+            
+            # Get app status (with error handling)
+            if ! app_json=$(argocd app get ${{ env.ARGOCD_APP_NAME }} -o json 2>&1); then
+              echo "Error getting app status: $app_json"
+              echo "status=App not found or error" >> $GITHUB_OUTPUT
+              echo "ready=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            
+            sync_status=$(echo "$app_json" | jq -r '.status.sync.status // "Unknown"')
+            health_status=$(echo "$app_json" | jq -r '.status.health.status // "Unknown"')
+            operation_state=$(echo "$app_json" | jq -r '.status.operationState.phase // "None"')
+            
+            echo "Sync Status: $sync_status"
+            echo "Health Status: $health_status"
+            echo "Operation State: $operation_state"
+            
+            # Check for success
+            if [ "$sync_status" == "Synced" ] && [ "$health_status" == "Healthy" ]; then
+              echo "✅ Deployment successful!"
+              echo "status=Deployment Successful" >> $GITHUB_OUTPUT
+              echo "ready=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            # Check for degraded state
+            if [ "$health_status" == "Degraded" ]; then
+              echo "❌ Deployment degraded"
+              argocd app get ${{ env.ARGOCD_APP_NAME }}
+              echo "status=Deployment Degraded" >> $GITHUB_OUTPUT
+              echo "ready=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            
+            # Check for failed operation
+            if [ "$operation_state" == "Failed" ]; then
+              echo "❌ Sync operation failed"
+              argocd app get ${{ env.ARGOCD_APP_NAME }}
+              echo "status=Sync Failed" >> $GITHUB_OUTPUT
+              echo "ready=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            
+            sleep $interval
+            elapsed=$((elapsed + interval))
+          done
+          
+          echo "⏱️ Timeout waiting for deployment"
+          echo "status=Timeout" >> $GITHUB_OUTPUT
+          echo "ready=false" >> $GITHUB_OUTPUT
+          exit 1
+
+  run-functional-tests:
+    name: Run Karate Functional Tests
+    needs: wait-for-deployment
+    runs-on: self-hosted
+    if: needs.wait-for-deployment.outputs.deployment-ready == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Wait for service to be ready
+        run: |
+          echo "Waiting for service health check at ${{ env.DEV_URL }}"
+          timeout=120
+          elapsed=0
+          
+          while [ $elapsed -lt $timeout ]; do
+            if curl -f -s ${{ env.DEV_URL }}/_health > /dev/null 2>&1; then
+              echo "✅ Service is ready!"
+              exit 0
+            fi
+            echo "Waiting for service... ($elapsed/$timeout seconds)"
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
+          
+          echo "❌ Service health check timeout"
+          exit 1
+      
+      - name: Run Karate Tests
+        working-directory: testing/functional/karate
+        run: |
+          echo "Running Karate tests against ${{ env.DEV_URL }}"
+          mvn clean test \
+            -Dkarate.env=dev \
+            -Dtest.url=${{ env.DEV_URL }} \
+            -Dkarate.options="--tags ~@ignore" || true
+      
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: testing/functional/karate/target/surefire-reports/*.xml
+      
+      - name: Upload Test Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: karate-test-reports
+          path: testing/functional/karate/target/karate-reports/
+          retention-days: 30
+      
       - name: Comment PR with Results
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const deployStatus = '${{ needs.wait-for-deployment.outputs.deployment-status }}';
-
-            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-
+            
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `
-## 🧪 Dev Environment Test Results
-
-**Deployment Status:** ${deployStatus}
-**Tests:** Completed
-
-[View detailed test report](${runUrl})
-`
-            });
+              body: `## 🧪 Dev Environment Test Results
+              
+            **Deployment Status:** ${deployStatus}
+            **Tests:** Completed
+            
+            [View detailed test report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+            })
