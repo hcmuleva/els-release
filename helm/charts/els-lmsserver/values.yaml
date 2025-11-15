@@ -28,7 +28,7 @@ elslmsserver:
 
 ingress:
   enabled: true
-  host: "dev2-els-lmsserver.local"
+  host: "dev-els-lmsserver.local"
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
