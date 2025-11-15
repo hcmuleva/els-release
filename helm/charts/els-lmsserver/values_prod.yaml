@@ -16,8 +16,13 @@ elslmsserver:
     DATABASE_NAME: "elslmsprod"
     DATABASE_USERNAME: "postgres"
     DATABASE_PASSWORD: "postgres"
-    PUBLIC_URL: "http://els-lmsserver.local"
-    ALLOWED_HOSTS: "localhost,127.0.0.1,els-lmsserver.local,elslms.local,els-lms-api.local,els-lms-ui.local"
+    APP_KEYS: B0dHK07fL+o6ha4Y7T/dBg==,KNHRAcYqezZ9i/4NAKaKrA==,tCWCEff/xF1M8nuTA6KOCg==,98aVEzN4mFYKK/gVuFWFMQ==
+    API_TOKEN_SALT: UZbp4y93fwS8vaxZ9wPqgA==
+    ADMIN_JWT_SECRET: uxNppuQFOdZl4jeFiY3KJg==
+    TRANSFER_TOKEN_SALT: lxHiqPp4tfxP8roPp7gOOQ==
+    ENCRYPTION_KEY: 9Y+SbEFrJWHS7JzaXD/q3Q==
+    PUBLIC_URL: "http://prod-els-lmsserver.local"
+    ALLOWED_HOSTS: "localhost,127.0.0.1,els-lmsserver.local,prod-els-lmsserver.local,elslms.local,els-lms-api.local,els-lms-ui.local"
 
 
 ingress:
