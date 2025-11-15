@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: els-lmsclient-feature-branches
+  namespace: argocd
+spec:
+  generators:
+  - git:
+      repoURL: https://github.com/hcmuleva/els-demo.git
+      revision: "{{branch}}" # Dynamically uses the branch discovered by the generator
+      directories:
+      - path: "helm/charts/els-lmsclient"
+  - git:
+      repoURL: https://github.com/hcmuleva/els-demo.git
+      revision: "{{branch}}"
+      directories:
+      - path: "helm/charts/els-lmsserver"
+  template:
+    metadata:
+      name: '{{path.basename}}-{{branch | replace "/" "-"}}' # Creates unique app names
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/hcmuleva/els-demo.git
+        targetRevision: '{{branch}}' # Deploys from the specific branch
+        path: '{{path}}'
+        helm:
+          valueFiles:
+            - values_dev.yaml # Always uses the dev values file
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: els-lms-dev
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true

@@ -1,10 +1,14 @@
 name: CI
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
     branches:
-      - main
+      - 'feature/**'
+      - 'bug/**'
+      - 'major/**'
+      - 'minor/**'
+      - 'patch/**'
+  
 
 permissions:
   contents: write
@@ -182,6 +186,7 @@ jobs:
 
       - name: Update values_dev.yaml files
         run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           VERSION="${{ needs.get-version.outputs.version }}"
           
           # Update lmsclient values_dev.yaml
