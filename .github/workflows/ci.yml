@@ -285,38 +285,3 @@ jobs:
               console.log('📊 Summary logged to console instead');
             }
   
-    name: CI Summary
-    runs-on: ubuntu-latest
-    needs: [get-version, build-lmsclient, build-lmsserver, update-helm-dev]
-    if: always()
-    steps:
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            const version = '${{ needs.get-version.outputs.version }}';
-            const semver = '${{ needs.get-version.outputs.semver }}';
-            
-            let body = `## 🚀 CI Pipeline Summary\n\n`;
-            body += `**Dev Build Version:** \`${version}\`\n`;
-            body += `**Future Release Version:** \`${semver}\`\n\n`;
-            body += `### 📦 Built Images:\n`;
-            
-            if ('${{ needs.build-lmsclient.result }}' === 'success') {
-              body += `- ✅ \`els-lmsclient:${version}\`\n`;
-            }
-            if ('${{ needs.build-lmsserver.result }}' === 'success') {
-              body += `- ✅ \`els-lmsserver:${version}\`\n`;
-            }
-            
-            body += `\n### 📝 Next Steps:\n`;
-            body += `1. ArgoCD will detect changes in \`values_dev.yaml\`\n`;
-            body += `2. Automatic deployment to **dev** environment\n`;
-            body += `3. Karate tests will run post-deployment\n`;
-            body += `4. After merge, version \`${semver}\` will be released\n`;
-            
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
