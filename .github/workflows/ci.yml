@@ -1,10 +1,14 @@
 name: CI
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
     branches:
-      - main
+      - 'feature/**'
+      - 'bug/**'
+      - 'major/**'
+      - 'minor/**'
+      - 'patch/**'
+  
 
 permissions:
   contents: write
@@ -41,34 +45,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Required for full git history[citation:8]
       
-      - name: Get PR labels
-        id: pr-labels
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number
-            });
-            const labels = pr.data.labels.map(l => l.name);
-            core.setOutput('labels', labels.join(','));
-            
-            // Determine bump type
-            let bump = 'patch';
-            if (labels.includes('major')) bump = 'major';
-            else if (labels.includes('minor')) bump = 'minor';
-            
-            core.setOutput('bump', bump);
-            return bump;
-
-      - name: Calculate next version
+      - name: Calculate next version from branch name
         id: version
         run: |
           CURRENT=$(cat VERSION 2>/dev/null || echo "0.0.0")
-          BUMP="${{ steps.pr-labels.outputs.bump }}"
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          
+          # Determine bump type from branch name
+          case "${BRANCH_NAME}" in
+            major/*)
+              BUMP="major"
+              ;;
+            minor/*)
+              BUMP="minor"
+              ;;
+            patch/*)
+              BUMP="patch"
+              ;;
+            *)
+              BUMP="patch"  # Default for feature/bug branches
+              ;;
+          esac
           
           IFS='.' read -r major minor patch <<< "$CURRENT"
           
@@ -90,16 +89,18 @@ jobs:
           NEXT_VERSION="${major}.${minor}.${patch}"
           SEMVER="v${NEXT_VERSION}"
           
-          # Use PR number for dev builds
-          DEV_VERSION="${NEXT_VERSION}-pr${{ github.event.pull_request.number }}"
+          # Use branch name and commit SHA for dev builds
+          CLEAN_BRANCH=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g')
+          DEV_VERSION="${NEXT_VERSION}-${CLEAN_BRANCH}-${GITHUB_SHA:0:8}"
           
           echo "version=${DEV_VERSION}" >> $GITHUB_OUTPUT
           echo "semver=${SEMVER}" >> $GITHUB_OUTPUT
           
           echo "📦 Current: $CURRENT"
+          echo "📦 Branch: $BRANCH_NAME"
+          echo "📦 Bump Type: $BUMP"
           echo "📦 Next Release: $SEMVER"
           echo "📦 Dev Build: $DEV_VERSION"
-
   test-lmsclient:
     name: Test LMS Client
     runs-on: ubuntu-latest
@@ -178,10 +179,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.ref }}
 
       - name: Update values_dev.yaml files
         run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           VERSION="${{ needs.get-version.outputs.version }}"
           
           # Update lmsclient values_dev.yaml
@@ -196,6 +198,27 @@ jobs:
             sed -i "s/tag: .*/tag: \"${VERSION}\"/" \
               $HELM_BASE/els-lmsserver/values_dev.yaml
             echo "✅ Updated els-lmsserver/values_dev.yaml"
+          fi
+      - name: Register branch in ArgoCD ApplicationSet
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          APPLICATIONSET_FILE="helm/charts/argocd/applicationset/els-lmsserver-simple.yaml"
+          
+          # Check if branch matches our patterns
+          if [[ "$BRANCH_NAME" =~ ^(feature|bug|bugfix|patch|minor|major)/.+ ]]; then
+            echo "📝 Registering branch in ArgoCD ApplicationSet: $BRANCH_NAME"
+            
+            # Check if branch already exists in the list
+            if grep -q "branch: $BRANCH_NAME" "$APPLICATIONSET_FILE"; then
+              echo "ℹ️ Branch already registered in ApplicationSet"
+            else
+              # Add branch to the list (before the template section)
+              sed -i "/elements:/a\\      - branch: $BRANCH_NAME\\n        namespace: els-lms-dev" "$APPLICATIONSET_FILE"
+              echo "✅ Added branch to ApplicationSet"
+              git add "$APPLICATIONSET_FILE"
+            fi
+          else
+            echo "ℹ️ Branch $BRANCH_NAME doesn't match deployment patterns, skipping ArgoCD registration"
           fi
 
       - name: Commit and push changes
@@ -212,7 +235,6 @@ jobs:
             git push
             echo "✅ Pushed Helm value updates"
           fi
-
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
@@ -224,28 +246,63 @@ jobs:
           script: |
             const version = '${{ needs.get-version.outputs.version }}';
             const semver = '${{ needs.get-version.outputs.semver }}';
+            const branch = '${{ github.ref_name }}';
             
-            let body = `## 🚀 CI Pipeline Summary\n\n`;
-            body += `**Dev Build Version:** \`${version}\`\n`;
-            body += `**Future Release Version:** \`${semver}\`\n\n`;
-            body += `### 📦 Built Images:\n`;
+            let summary = `## 🚀 CI Pipeline Summary\n\n`;
+            summary += `**Branch:** \`${branch}\`\n`;
+            summary += `**Dev Build Version:** \`${version}\`\n`;
+            summary += `**Future Release Version:** \`${semver}\`\n\n`;
+            summary += `### 📦 Built Images:\n`;
             
             if ('${{ needs.build-lmsclient.result }}' === 'success') {
-              body += `- ✅ \`els-lmsclient:${version}\`\n`;
+              summary += `- ✅ \`els-lmsclient:${version}\`\n`;
             }
             if ('${{ needs.build-lmsserver.result }}' === 'success') {
-              body += `- ✅ \`els-lmsserver:${version}\`\n`;
+              summary += `- ✅ \`els-lmsserver:${version}\`\n`;
             }
             
-            body += `\n### 📝 Next Steps:\n`;
-            body += `1. ArgoCD will detect changes in \`values_dev.yaml\`\n`;
-            body += `2. Automatic deployment to **dev** environment\n`;
-            body += `3. Karate tests will run post-deployment\n`;
-            body += `4. After merge, version \`${semver}\` will be released\n`;
+            summary += `\n### 📝 Next Steps:\n`;
+            summary += `1. ArgoCD will detect changes in \`values_dev.yaml\`\n`;
+            summary += `2. Automatic deployment to **dev** environment\n`;
+            summary += `3. Karate tests will run post-deployment\n`;
+            summary += `4. After merge, version \`${semver}\` will be released\n`;
             
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
+            // Log summary to console
+            console.log(summary);
+            
+            // Try to post comment if this is a PR, otherwise just log
+            try {
+              if (context.issue.number) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: summary
+                });
+                console.log('✅ Posted comment to PR #' + context.issue.number);
+              } else {
+                // Not a PR, try to find related PR
+                const prs = await github.rest.pulls.list({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  head: `${context.repo.owner}:${branch}`,
+                  state: 'open'
+                });
+                
+                if (prs.data.length > 0) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prs.data[0].number,
+                    body: summary
+                  });
+                  console.log('✅ Posted comment to PR #' + prs.data[0].number);
+                } else {
+                  console.log('ℹ️ No PR found for this branch - summary logged to console');
+                }
+              }
+            } catch (error) {
+              console.log('⚠️ Could not post PR comment:', error.message);
+              console.log('📊 Summary logged to console instead');
+            }
+  

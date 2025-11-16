@@ -1,0 +1,51 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: els-lmsserver-branches
+  namespace: argocd
+spec:
+  generators:
+  - list:
+      elements:
+      # This list will be managed by CI workflow
+      # CI will add/update branches automatically
+      - branch: major/helm_lms
+        namespace: els-lms-dev
+  
+  template:
+    metadata:
+      name: 'els-lmsserver-{{branch | replace "/" "-"}}'
+      namespace: argocd
+      labels:
+        app: els-lmsserver
+        environment: dev
+        branch: '{{branch}}'
+    spec:
+      project: default
+      
+      source:
+        repoURL: https://github.com/hcmuleva/els-demo.git
+        targetRevision: '{{branch}}'
+        path: helm/charts/els-lmsserver
+        helm:
+          valueFiles:
+            - values_dev.yaml
+      
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+
