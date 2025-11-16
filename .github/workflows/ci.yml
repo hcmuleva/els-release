@@ -214,8 +214,77 @@ jobs:
             git push
             echo "✅ Pushed Helm value updates"
           fi
-
   ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [get-version, build-lmsclient, build-lmsserver, update-helm-dev]
+    if: always()
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.get-version.outputs.version }}';
+            const semver = '${{ needs.get-version.outputs.semver }}';
+            const branch = '${{ github.ref_name }}';
+            
+            let summary = `## 🚀 CI Pipeline Summary\n\n`;
+            summary += `**Branch:** \`${branch}\`\n`;
+            summary += `**Dev Build Version:** \`${version}\`\n`;
+            summary += `**Future Release Version:** \`${semver}\`\n\n`;
+            summary += `### 📦 Built Images:\n`;
+            
+            if ('${{ needs.build-lmsclient.result }}' === 'success') {
+              summary += `- ✅ \`els-lmsclient:${version}\`\n`;
+            }
+            if ('${{ needs.build-lmsserver.result }}' === 'success') {
+              summary += `- ✅ \`els-lmsserver:${version}\`\n`;
+            }
+            
+            summary += `\n### 📝 Next Steps:\n`;
+            summary += `1. ArgoCD will detect changes in \`values_dev.yaml\`\n`;
+            summary += `2. Automatic deployment to **dev** environment\n`;
+            summary += `3. Karate tests will run post-deployment\n`;
+            summary += `4. After merge, version \`${semver}\` will be released\n`;
+            
+            // Log summary to console
+            console.log(summary);
+            
+            // Try to post comment if this is a PR, otherwise just log
+            try {
+              if (context.issue.number) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: summary
+                });
+                console.log('✅ Posted comment to PR #' + context.issue.number);
+              } else {
+                // Not a PR, try to find related PR
+                const prs = await github.rest.pulls.list({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  head: `${context.repo.owner}:${branch}`,
+                  state: 'open'
+                });
+                
+                if (prs.data.length > 0) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prs.data[0].number,
+                    body: summary
+                  });
+                  console.log('✅ Posted comment to PR #' + prs.data[0].number);
+                } else {
+                  console.log('ℹ️ No PR found for this branch - summary logged to console');
+                }
+              }
+            } catch (error) {
+              console.log('⚠️ Could not post PR comment:', error.message);
+              console.log('📊 Summary logged to console instead');
+            }
+  
     name: CI Summary
     runs-on: ubuntu-latest
     needs: [get-version, build-lmsclient, build-lmsserver, update-helm-dev]
