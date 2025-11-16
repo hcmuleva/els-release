@@ -2,7 +2,7 @@ elslmsserver:
   enabled: true
   name: els-lmsserver
   image: harishdell/els-lmsserver
-  tag: "1.13.11-feature-autodeploy-f5552ea7"
+  tag: "1.13.11-feature-autodeploy-7bdd3d71"
   imagePullPolicy: IfNotPresent
   containerPort: 1337
   servicePort: 1337
