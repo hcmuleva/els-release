@@ -199,6 +199,27 @@ jobs:
               $HELM_BASE/els-lmsserver/values_dev.yaml
             echo "✅ Updated els-lmsserver/values_dev.yaml"
           fi
+      - name: Register branch in ArgoCD ApplicationSet
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          APPLICATIONSET_FILE="helm/charts/argocd/applicationset/els-lmsserver-simple.yaml"
+          
+          # Check if branch matches our patterns
+          if [[ "$BRANCH_NAME" =~ ^(feature|bug|bugfix|patch|minor|major)/.+ ]]; then
+            echo "📝 Registering branch in ArgoCD ApplicationSet: $BRANCH_NAME"
+            
+            # Check if branch already exists in the list
+            if grep -q "branch: $BRANCH_NAME" "$APPLICATIONSET_FILE"; then
+              echo "ℹ️ Branch already registered in ApplicationSet"
+            else
+              # Add branch to the list (before the template section)
+              sed -i "/elements:/a\\      - branch: $BRANCH_NAME\\n        namespace: els-lms-dev" "$APPLICATIONSET_FILE"
+              echo "✅ Added branch to ApplicationSet"
+              git add "$APPLICATIONSET_FILE"
+            fi
+          else
+            echo "ℹ️ Branch $BRANCH_NAME doesn't match deployment patterns, skipping ArgoCD registration"
+          fi
 
       - name: Commit and push changes
         run: |
