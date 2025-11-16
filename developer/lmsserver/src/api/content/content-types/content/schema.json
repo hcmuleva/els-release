@@ -6,7 +6,6 @@
     "pluralName": "contents",
     "displayName": "content"
   },
-  
   "options": {
     "draftAndPublish": true
   },
