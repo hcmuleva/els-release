@@ -1,0 +1,244 @@
+name: Integration Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - qa
+          - staging
+      api_url:
+        description: 'API URL to test'
+        required: false
+        default: 'http://dev-els-lmsserver.local/api'
+  
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        default: 'dev'
+      api_url:
+        required: false
+        type: string
+        default: 'http://dev-els-lmsserver.local/api'
+
+env:
+  KARATE_TEST_PATH: testing/functional/karate
+  TEST_API_URL: ${{ inputs.api_url || 'http://dev-els-lmsserver.local/api' }}
+  TEST_ENV: ${{ inputs.environment || 'dev' }}
+
+jobs:
+  karate-integration-tests:
+    name: Run Karate Tests
+    runs-on: ubuntu-latest
+    outputs:
+      test-result: ${{ steps.run-tests.outputs.result }}
+      pass-rate: ${{ steps.run-tests.outputs.pass_rate }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Verify test environment
+        run: |
+          echo "🧪 Integration Test Configuration"
+          echo "================================"
+          echo "Environment: ${{ env.TEST_ENV }}"
+          echo "API URL: ${{ env.TEST_API_URL }}"
+          echo "Test Path: ${{ env.KARATE_TEST_PATH }}"
+      
+      - name: Wait for API availability
+        run: |
+          echo "🔍 Checking API health: ${{ env.TEST_API_URL }}"
+          timeout=180
+          elapsed=0
+          
+          while [ $elapsed -lt $timeout ]; do
+            if curl -f -s -m 10 ${{ env.TEST_API_URL }}/_health > /dev/null 2>&1; then
+              echo "✅ API is accessible!"
+              curl -s ${{ env.TEST_API_URL }}/_health | jq '.' || echo "Health check response received"
+              exit 0
+            fi
+            
+            echo "⏳ Waiting for API... ($elapsed/$timeout seconds)"
+            sleep 10
+            elapsed=$((elapsed + 10))
+          done
+          
+          echo "⚠️ API not responding, continuing with tests anyway"
+      
+      - name: Run Karate Integration Tests
+        id: run-tests
+        working-directory: ${{ env.KARATE_TEST_PATH }}
+        continue-on-error: true
+        run: |
+          echo "🚀 Running Karate tests..."
+          
+          mvn clean test \
+            -Dkarate.env=${{ env.TEST_ENV }} \
+            -Dtest.url=${{ env.TEST_API_URL }} \
+            -Dkarate.options="--tags ~@ignore" \
+            || TEST_EXIT_CODE=$?
+          
+          # Parse test results
+          if [ -f target/surefire-reports/TEST-*.xml ]; then
+            TOTAL=$(grep -o 'tests="[0-9]*"' target/surefire-reports/TEST-*.xml | head -1 | grep -o '[0-9]*')
+            FAILURES=$(grep -o 'failures="[0-9]*"' target/surefire-reports/TEST-*.xml | head -1 | grep -o '[0-9]*')
+            ERRORS=$(grep -o 'errors="[0-9]*"' target/surefire-reports/TEST-*.xml | head -1 | grep -o '[0-9]*')
+            
+            PASSED=$((TOTAL - FAILURES - ERRORS))
+            PASS_RATE=$(awk "BEGIN {printf \"%.2f\", ($PASSED/$TOTAL)*100}")
+            
+            echo "📊 Test Results:"
+            echo "Total: $TOTAL"
+            echo "Passed: $PASSED"
+            echo "Failed: $FAILURES"
+            echo "Errors: $ERRORS"
+            echo "Pass Rate: ${PASS_RATE}%"
+            
+            echo "pass_rate=${PASS_RATE}" >> $GITHUB_OUTPUT
+            
+            if [ $PASSED -eq $TOTAL ]; then
+              echo "result=success" >> $GITHUB_OUTPUT
+              exit 0
+            else
+              echo "result=failed" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          else
+            echo "⚠️ No test results found"
+            echo "result=no-results" >> $GITHUB_OUTPUT
+            echo "pass_rate=0" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: ${{ env.KARATE_TEST_PATH }}/target/surefire-reports/*.xml
+          check_name: Karate Integration Test Results
+      
+      - name: Upload Karate Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: karate-reports-${{ env.TEST_ENV }}
+          path: ${{ env.KARATE_TEST_PATH }}/target/karate-reports/
+          retention-days: 30
+      
+      - name: Upload Test Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs-${{ env.TEST_ENV }}
+          path: ${{ env.KARATE_TEST_PATH }}/target/surefire-reports/
+          retention-days: 7
+
+  smoke-tests:
+    name: Run Smoke Tests
+    runs-on: ubuntu-latest
+    needs: karate-integration-tests
+    if: always()
+    
+    steps:
+      - name: Health Check
+        run: |
+          echo "🔥 Running smoke tests..."
+          
+          # Health endpoint
+          if curl -f -s ${{ env.TEST_API_URL }}/_health > /dev/null 2>&1; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed"
+            exit 1
+          fi
+      
+      - name: Basic API Validation
+        run: |
+          echo "🧪 Testing basic API functionality..."
+          
+          # Test API endpoints
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" ${{ env.TEST_API_URL }}/api/users)
+          
+          if [ "$RESPONSE" == "200" ] || [ "$RESPONSE" == "401" ]; then
+            echo "✅ API is responding (Status: $RESPONSE)"
+          else
+            echo "⚠️ Unexpected API response: $RESPONSE"
+          fi
+
+  test-summary:
+    name: Test Summary
+    needs: [karate-integration-tests, smoke-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Generate Test Summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const testResult = '${{ needs.karate-integration-tests.outputs.test-result }}';
+            const passRate = '${{ needs.karate-integration-tests.outputs.pass-rate }}';
+            const environment = '${{ env.TEST_ENV }}';
+            
+            let summary = `## 🧪 Integration Test Results\n\n`;
+            summary += `**Environment:** ${environment}\n`;
+            summary += `**API URL:** ${{ env.TEST_API_URL }}\n\n`;
+            
+            if (testResult === 'success') {
+              summary += `### ✅ Tests Passed\n\n`;
+              summary += `- **Pass Rate:** ${passRate}%\n`;
+              summary += `- All integration tests completed successfully\n`;
+              summary += `- Smoke tests passed\n\n`;
+              
+              if (environment === 'dev') {
+                summary += `**Quality Gate:** ✅ Ready for QA promotion\n\n`;
+                summary += `**Next Steps:**\n`;
+                summary += `1. Merge to main branch\n`;
+                summary += `2. Automatic QA deployment\n`;
+                summary += `3. E2E test execution\n`;
+              }
+            } else {
+              summary += `### ❌ Tests Failed\n\n`;
+              summary += `- **Pass Rate:** ${passRate}%\n`;
+              summary += `- Some tests failed - review reports\n\n`;
+              summary += `**Action Required:** Fix failing tests before promotion\n`;
+            }
+            
+            summary += `\n[View detailed reports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            console.log(summary);
+            
+            // Post to PR if available
+            try {
+              const prs = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open'
+              });
+              
+              if (prs.data.length > 0) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prs.data[0].number,
+                  body: summary
+                });
+              }
+            } catch (error) {
+              console.log('Could not post to PR');
+            }

@@ -1,34 +1,45 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: els-lmsclient-feature-branches
+  name: els-lmsserver-feature-branches
   namespace: argocd
 spec:
   generators:
-  - list:
-      elements:
-      - branch: feature/autodeploy
-        name: feature-autodeploy
-      - branch: feature/add-new-api
-        name: feature-add-new-api
-      - branch: major/helm_lms
-        name: major-helm-lms
+  - git:
+      repoURL: https://github.com/hcmuleva/els-demo.git
+      revision: HEAD
+      directories:
+      - path: helm/charts/els-lmsserver
+      branches:
+      - 'feature/*'
+      - 'bug/*'
+      - 'patch/*'
+      - 'minor/*'
+      - 'major/*'
 
   template:
     metadata:
-      name: 'els-lmsclient-{{branch}}'
+      name: 'els-lmsserver-{{branch}}-{{path.basename}}'
+      namespace: argocd
+      labels:
+        app: els-lmsserver
+        environment: dev
+        branch: '{{branch}}'
     spec:
       project: default
+      
       source:
         repoURL: https://github.com/hcmuleva/els-demo.git
         targetRevision: '{{branch}}'
-        path: helm/charts/els-lmsclient
+        path: helm/charts/els-lmsserver
         helm:
           valueFiles:
             - values_dev.yaml
+      
       destination:
         server: https://kubernetes.default.svc
         namespace: els-lms-dev
+      
       syncPolicy:
         automated:
           prune: true
@@ -42,3 +53,10 @@ spec:
             duration: 5s
             factor: 2
             maxDuration: 3m
+      
+      # Health checks
+      ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        jsonPointers:
+        - /spec/replicas
