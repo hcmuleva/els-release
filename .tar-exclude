@@ -1,0 +1,18 @@
+# .tar-exclude
+node_modules
+actions-runner
+dist
+build
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+.git
+.DS_Store
+*.log
+coverage
+.cache
+.nyc_output
+.next
+.nuxt
+out

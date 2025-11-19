@@ -18,6 +18,7 @@ env:
   ARGOCD_NAMESPACE: argocd
   KARATE_IMAGE: harishdell/karate:1.0
 
+  
 jobs:
   detect-changes:
     name: Detect Environment Changes

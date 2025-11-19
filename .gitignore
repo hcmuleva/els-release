@@ -1,0 +1,65 @@
+# ------------------------------
+# Global ignores
+# ------------------------------
+
+# macOS system files
+.DS_Store
+
+# Node / JS packages (if any)
+node_modules/
+
+# Logs
+*.log
+
+# TAR archives
+*.tar
+*.tar.gz
+*.tgz
+
+# ------------------------------
+# Maven / Java ignores
+# ------------------------------
+
+# Maven output folders
+target/
+**/target/
+
+# Eclipse / IntelliJ
+*.classpath
+*.project
+*.idea/
+*.iml
+*.prefs
+
+# Java crash logs
+hs_err_pid*
+replay_pid*
+
+# ------------------------------
+# Karate Test Project
+# ------------------------------
+
+# Ignore test reports
+testing/functional/karate/target/
+testing/functional/karate/reports/
+*/karate-reports/
+
+# ------------------------------
+# GitHub Actions Runner
+# ------------------------------
+
+# Self-hosted runner directory
+actions-runner/
+actions-runner/**
+
+# If runner exists in nested path too
+**/actions-runner/
+
+# ------------------------------
+# Docker / Build
+# ------------------------------
+
+# Docker build cache
+*.cache
+.cache/
+

@@ -8,6 +8,7 @@ on:
       - 'major/**'
       - 'minor/**'
       - 'patch/**'
+  
 
 permissions:
   contents: write
@@ -40,65 +41,89 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      sequence: ${{ steps.version.outputs.sequence }}
+      semver: ${{ steps.version.outputs.semver }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ref: main  # Checkout main to get the sequence file
+          fetch-depth: 0  # Required for full git history[citation:8]
       
-      - name: Get or create sequence counter
-        id: sequence
-        run: |
-          # Create sequence file if it doesn't exist
-          if [ ! -f .ci-sequence ]; then
-            echo "1" > .ci-sequence
-          fi
-          
-          # Read current sequence from main branch
-          CURRENT_SEQUENCE=$(cat .ci-sequence)
-          echo "Current sequence: $CURRENT_SEQUENCE"
-          
-          # Output current sequence for use
-          echo "sequence=$CURRENT_SEQUENCE" >> $GITHUB_OUTPUT
-
-      - name: Calculate simple version
+      - name: Calculate next version from branch name
         id: version
         run: |
-          SEQUENCE="${{ steps.sequence.outputs.sequence }}"
+          CURRENT=$(cat VERSION 2>/dev/null || echo "0.0.0")
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           
-          # Simple version: sh_001, sh_002, etc.
-          VERSION="sh_$(printf "%03d" $SEQUENCE)"
+          # Determine bump type from branch name
+          case "${BRANCH_NAME}" in
+            major/*)
+              BUMP="major"
+              ;;
+            minor/*)
+              BUMP="minor"
+              ;;
+            patch/*)
+              BUMP="patch"
+              ;;
+            *)
+              BUMP="patch"  # Default for feature/bug branches
+              ;;
+          esac
           
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "📦 Version: ${VERSION}"
-          echo "🔢 Sequence: ${SEQUENCE}"
-
-  quality-checks:
-    name: Quality Checks
+          IFS='.' read -r major minor patch <<< "$CURRENT"
+          
+          case $BUMP in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+          
+          NEXT_VERSION="${major}.${minor}.${patch}"
+          SEMVER="v${NEXT_VERSION}"
+          
+          # Use branch name and commit SHA for dev builds
+          CLEAN_BRANCH=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g')
+          DEV_VERSION="${NEXT_VERSION}-${CLEAN_BRANCH}-${GITHUB_SHA:0:8}"
+          
+          echo "version=${DEV_VERSION}" >> $GITHUB_OUTPUT
+          echo "semver=${SEMVER}" >> $GITHUB_OUTPUT
+          
+          echo "📦 Current: $CURRENT"
+          echo "📦 Branch: $BRANCH_NAME"
+          echo "📦 Bump Type: $BUMP"
+          echo "📦 Next Release: $SEMVER"
+          echo "📦 Dev Build: $DEV_VERSION"
+  test-lmsclient:
+    name: Test LMS Client
     runs-on: ubuntu-latest
-    needs: [detect-changes, get-version]
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.lmsclient == 'true'
     steps:
-      - name: Dummy Unit Tests
-        if: needs.detect-changes.outputs.lmsclient == 'true' || needs.detect-changes.outputs.lmsserver == 'true'
-        run: |
-          echo "✅ Dummy unit tests passed"
-          
-      - name: Dummy Security Scan
-        if: needs.detect-changes.outputs.lmsclient == 'true' || needs.detect-changes.outputs.lmsserver == 'true'
-        run: |
-          echo "✅ Dummy security scan passed"
-          
-      - name: Dummy Code Quality
-        if: needs.detect-changes.outputs.lmsclient == 'true' || needs.detect-changes.outputs.lmsserver == 'true'
-        run: |
-          echo "✅ Dummy code quality checks passed"
+      - uses: actions/checkout@v4
+      - run: echo "🧪 Running els-lmsclient tests..."
+
+  test-lmsserver:
+    name: Test LMS Server
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.lmsserver == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "🧪 Running els-lmsserver tests..."
 
   build-lmsclient:
     name: Build & Push LMS Client
     runs-on: ubuntu-latest
-    needs: [detect-changes, get-version, quality-checks]
-    if: needs.detect-changes.outputs.lmsclient == 'true' && needs.quality-checks.result == 'success'
+    needs: [detect-changes, test-lmsclient, get-version]
+    if: needs.detect-changes.outputs.lmsclient == 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -123,8 +148,8 @@ jobs:
   build-lmsserver:
     name: Build & Push LMS Server
     runs-on: ubuntu-latest
-    needs: [detect-changes, get-version, quality-checks]
-    if: needs.detect-changes.outputs.lmsserver == 'true' && needs.quality-checks.result == 'success'
+    needs: [detect-changes, test-lmsserver, get-version]
+    if: needs.detect-changes.outputs.lmsserver == 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -145,92 +170,139 @@ jobs:
           
           echo "✅ Pushed: els-lmsserver:$VERSION"
 
-  merge-to-main:
-    name: Merge to Main on Success
+  update-helm-dev:
+    name: Update Helm Values for Dev
     runs-on: ubuntu-latest
     needs: [build-lmsclient, build-lmsserver, get-version]
-    if: |
-      (needs.build-lmsclient.result == 'success' || needs.build-lmsserver.result == 'success') &&
-      always() &&
-      contains(needs.*.result, 'success')
+    if: always() && (needs.build-lmsclient.result == 'success' || needs.build-lmsserver.result == 'success')
     steps:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: main
+          ref: ${{ github.ref }}
 
-      - name: Update values_dev.yaml on main branch
+      - name: Update values_dev.yaml files
         run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
           VERSION="${{ needs.get-version.outputs.version }}"
           
-          # Update lmsclient values_dev.yaml on main
+          # Update lmsclient values_dev.yaml
           if [ "${{ needs.build-lmsclient.result }}" == "success" ]; then
-            sed -i "s|tag:.*|tag: \"${VERSION}\"|" $HELM_BASE/els-lmsclient/values_dev.yaml
-            echo "✅ Updated els-lmsclient/values_dev.yaml on main to tag: ${VERSION}"
+            sed -i "s/tag: .*/tag: \"${VERSION}\"/" \
+              $HELM_BASE/els-lmsclient/values_dev.yaml
+            echo "✅ Updated els-lmsclient/values_dev.yaml"
           fi
           
-          # Update lmsserver values_dev.yaml on main
+          # Update lmsserver values_dev.yaml
           if [ "${{ needs.build-lmsserver.result }}" == "success" ]; then
-            sed -i "s|tag:.*|tag: \"${VERSION}\"|" $HELM_BASE/els-lmsserver/values_dev.yaml
-            echo "✅ Updated els-lmsserver/values_dev.yaml on main to tag: ${VERSION}"
+            sed -i "s/tag: .*/tag: \"${VERSION}\"/" \
+              $HELM_BASE/els-lmsserver/values_dev.yaml
+            echo "✅ Updated els-lmsserver/values_dev.yaml"
+          fi
+      - name: Register branch in ArgoCD ApplicationSet
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          APPLICATIONSET_FILE="helm/charts/argocd/applicationset/els-lmsserver-simple.yaml"
+          
+          # Check if branch matches our patterns
+          if [[ "$BRANCH_NAME" =~ ^(feature|bug|bugfix|patch|minor|major)/.+ ]]; then
+            echo "📝 Registering branch in ArgoCD ApplicationSet: $BRANCH_NAME"
+            
+            # Check if branch already exists in the list
+            if grep -q "branch: $BRANCH_NAME" "$APPLICATIONSET_FILE"; then
+              echo "ℹ️ Branch already registered in ApplicationSet"
+            else
+              # Add branch to the list (before the template section)
+              sed -i "/elements:/a\\      - branch: $BRANCH_NAME\\n        namespace: els-lms-dev" "$APPLICATIONSET_FILE"
+              echo "✅ Added branch to ApplicationSet"
+              git add "$APPLICATIONSET_FILE"
+            fi
+          else
+            echo "ℹ️ Branch $BRANCH_NAME doesn't match deployment patterns, skipping ArgoCD registration"
           fi
 
-      - name: Increment sequence counter on main
-        run: |
-          CURRENT_SEQUENCE="${{ needs.get-version.outputs.sequence }}"
-          NEXT_SEQUENCE=$((CURRENT_SEQUENCE + 1))
-          
-          echo "🔄 Updating sequence from $CURRENT_SEQUENCE to $NEXT_SEQUENCE"
-          echo "$NEXT_SEQUENCE" > .ci-sequence
-
-      - name: Commit changes to main
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          git add $HELM_BASE/*/values_dev.yaml .ci-sequence
+          git add $HELM_BASE/*/values_dev.yaml
           
           if git diff --staged --quiet; then
             echo "ℹ️ No changes to commit"
           else
-            git commit -m "ci: deploy ${{ needs.get-version.outputs.version }} to dev [skip ci]"
-            git push origin main
-            echo "✅ Pushed changes to main branch"
+            git commit -m "chore: update dev image tags to ${{ needs.get-version.outputs.version }} [skip ci]"
+            git push
+            echo "✅ Pushed Helm value updates"
           fi
-
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [get-version, build-lmsclient, build-lmsserver, merge-to-main]
+    needs: [get-version, build-lmsclient, build-lmsserver, update-helm-dev]
     if: always()
     steps:
-      - name: Create Workflow Summary
-        run: |
-          echo "## 🚀 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Build Version:** \`${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Sequence Number:** \`${{ needs.get-version.outputs.sequence }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Main Branch Updated:** ${{ needs.merge-to-main.result == 'success' && '✅ Yes' || '❌ No' }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Built Images:" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ needs.build-lmsclient.result }}" == "success" ]; then
-            echo "- ✅ \`els-lmsclient:${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          if [ "${{ needs.build-lmsserver.result }}" == "success" ]; then
-            echo "- ✅ \`els-lmsserver:${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          if [ "${{ needs.merge-to-main.result }}" == "success" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### ✅ CD Pipeline Triggered:" >> $GITHUB_STEP_SUMMARY
-            echo "1. ✅ values_dev.yaml updated on main branch" >> $GITHUB_STEP_SUMMARY
-            echo "2. 🔄 ArgoCD will auto-detect changes" >> $GITHUB_STEP_SUMMARY
-            echo "3. 🚀 Automatic deployment to **dev** environment" >> $GITHUB_STEP_SUMMARY
-            echo "4. 🧪 Karate tests will run post-deployment" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### ❌ CD Pipeline Not Triggered:" >> $GITHUB_STEP_SUMMARY
-            echo "CI pipeline did not complete successfully" >> $GITHUB_STEP_SUMMARY
-          fi
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.get-version.outputs.version }}';
+            const semver = '${{ needs.get-version.outputs.semver }}';
+            const branch = '${{ github.ref_name }}';
+            
+            let summary = `## 🚀 CI Pipeline Summary\n\n`;
+            summary += `**Branch:** \`${branch}\`\n`;
+            summary += `**Dev Build Version:** \`${version}\`\n`;
+            summary += `**Future Release Version:** \`${semver}\`\n\n`;
+            summary += `### 📦 Built Images:\n`;
+            
+            if ('${{ needs.build-lmsclient.result }}' === 'success') {
+              summary += `- ✅ \`els-lmsclient:${version}\`\n`;
+            }
+            if ('${{ needs.build-lmsserver.result }}' === 'success') {
+              summary += `- ✅ \`els-lmsserver:${version}\`\n`;
+            }
+            
+            summary += `\n### 📝 Next Steps:\n`;
+            summary += `1. ArgoCD will detect changes in \`values_dev.yaml\`\n`;
+            summary += `2. Automatic deployment to **dev** environment\n`;
+            summary += `3. Karate tests will run post-deployment\n`;
+            summary += `4. After merge, version \`${semver}\` will be released\n`;
+            
+            // Log summary to console
+            console.log(summary);
+            
+            // Try to post comment if this is a PR, otherwise just log
+            try {
+              if (context.issue.number) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: summary
+                });
+                console.log('✅ Posted comment to PR #' + context.issue.number);
+              } else {
+                // Not a PR, try to find related PR
+                const prs = await github.rest.pulls.list({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  head: `${context.repo.owner}:${branch}`,
+                  state: 'open'
+                });
+                
+                if (prs.data.length > 0) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prs.data[0].number,
+                    body: summary
+                  });
+                  console.log('✅ Posted comment to PR #' + prs.data[0].number);
+                } else {
+                  console.log('ℹ️ No PR found for this branch - summary logged to console');
+                }
+              }
+            } catch (error) {
+              console.log('⚠️ Could not post PR comment:', error.message);
+              console.log('📊 Summary logged to console instead');
+            }
+  

@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "karate-tests.fullname" . }}
+  labels:
+    {{- include "karate-tests.labels" . | nindent 4 }}
+  annotations:
+    "argocd.argoproj.io/hook": PostSync
+    "argocd.argoproj.io/hook-delete-policy": HookSucceeded
+spec:
+  template:
+    spec:
+      containers:
+      - name: karate-runner
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: KARATE_ENV
+          value: {{ .Values.karate.env | quote }}
+        - name: TEST_URL
+          value: {{ .Values.test.url | quote }}
+        - name: KARATE_OPTIONS
+          value: {{ .Values.karate.options | quote }}
+        volumeMounts:
+        - name: test-reports
+          mountPath: /app/target/karate-reports
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      - name: test-reports
+        persistentVolumeClaim:
+          claimName: {{ include "karate-tests.fullname" . }}-reports
+      restartPolicy: Never
+  backoffLimit: {{ .Values.backoffLimit }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "karate-tests.fullname" . }}-reports
+  labels:
+    {{- include "karate-tests.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
