@@ -199,38 +199,38 @@ jobs:
           fi
 
   ci-summary:
-  name: CI Summary
-  runs-on: ubuntu-latest
-  needs: [get-version, build-lmsclient, build-lmsserver, merge-to-main]
-  if: always()
-  steps:
-    - name: Create Workflow Summary
-      run: |
-        echo "## 🚀 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Build Version:** \`${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "**Sequence Number:** \`${{ needs.get-version.outputs.sequence }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "**Main Branch Updated:** ${{ needs.merge-to-main.result == 'success' && '✅ Yes' || '❌ No' }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📦 Built Images:" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "${{ needs.build-lmsclient.result }}" == "success" ]; then
-          echo "- ✅ \`els-lmsclient:${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        if [ "${{ needs.build-lmsserver.result }}" == "success" ]; then
-          echo "- ✅ \`els-lmsserver:${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        if [ "${{ needs.merge-to-main.result }}" == "success" ]; then
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [get-version, build-lmsclient, build-lmsserver, merge-to-main]
+    if: always()
+    steps:
+      - name: Create Workflow Summary
+        run: |
+          echo "## 🚀 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ✅ CD Pipeline Triggered:" >> $GITHUB_STEP_SUMMARY
-          echo "1. ✅ values_dev.yaml updated on main branch" >> $GITHUB_STEP_SUMMARY
-          echo "2. 🔄 ArgoCD will auto-detect changes" >> $GITHUB_STEP_SUMMARY
-          echo "3. 🚀 Automatic deployment to **dev** environment" >> $GITHUB_STEP_SUMMARY
-          echo "4. 🧪 Karate tests will run post-deployment" >> $GITHUB_STEP_SUMMARY
-        else
+          echo "**Build Version:** \`${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Sequence Number:** \`${{ needs.get-version.outputs.sequence }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Main Branch Updated:** ${{ needs.merge-to-main.result == 'success' && '✅ Yes' || '❌ No' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ❌ CD Pipeline Not Triggered:" >> $GITHUB_STEP_SUMMARY
-          echo "CI pipeline did not complete successfully" >> $GITHUB_STEP_SUMMARY
-        fi
+          echo "### 📦 Built Images:" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.build-lmsclient.result }}" == "success" ]; then
+            echo "- ✅ \`els-lmsclient:${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.build-lmsserver.result }}" == "success" ]; then
+            echo "- ✅ \`els-lmsserver:${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.merge-to-main.result }}" == "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ CD Pipeline Triggered:" >> $GITHUB_STEP_SUMMARY
+            echo "1. ✅ values_dev.yaml updated on main branch" >> $GITHUB_STEP_SUMMARY
+            echo "2. 🔄 ArgoCD will auto-detect changes" >> $GITHUB_STEP_SUMMARY
+            echo "3. 🚀 Automatic deployment to **dev** environment" >> $GITHUB_STEP_SUMMARY
+            echo "4. 🧪 Karate tests will run post-deployment" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ❌ CD Pipeline Not Triggered:" >> $GITHUB_STEP_SUMMARY
+            echo "CI pipeline did not complete successfully" >> $GITHUB_STEP_SUMMARY
+          fi
