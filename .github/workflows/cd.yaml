@@ -7,47 +7,50 @@ on:
     paths:
       - 'helm/charts/**/values_dev.yaml'
       - 'helm/charts/**/values_qa.yaml'
-      - 'helm/charts/**/values_prod.yaml'
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 env:
   ARGOCD_SERVER: argocd.your-domain.com
-  ARGOCD_NAMESPACE: argocd
+  KARATE_IMAGE: your-registry/karate-tests
 
 jobs:
-  detect-environment:
-    name: Detect Environment
+  detect-changes:
+    name: Detect Environment Changes
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.detect.outputs.environment }}
       apps: ${{ steps.detect.outputs.apps }}
+      image_version: ${{ steps.detect.outputs.image_version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Detect which values file changed
+      - name: Detect changes and extract image version
         id: detect
         run: |
           CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
-          
           echo "Changed files:"
           echo "$CHANGED_FILES"
           
           ENVIRONMENT=""
           APPS=""
+          IMAGE_VERSION=""
           
+          # Check which values file changed
           if echo "$CHANGED_FILES" | grep -q "values_dev.yaml"; then
             ENVIRONMENT="dev"
+            # Extract image version from values_dev.yaml
+            IMAGE_VERSION=$(grep "tag:" helm/charts/els-lmsserver/values_dev.yaml | head -1 | awk -F'"' '{print $2}')
           elif echo "$CHANGED_FILES" | grep -q "values_qa.yaml"; then
             ENVIRONMENT="qa"
-          elif echo "$CHANGED_FILES" | grep -q "values_prod.yaml"; then
-            ENVIRONMENT="prod"
+            IMAGE_VERSION=$(grep "tag:" helm/charts/els-lmsserver/values_qa.yaml | head -1 | awk -F'"' '{print $2}')
           fi
           
+          # Detect which apps changed
           if echo "$CHANGED_FILES" | grep -q "els-lmsclient/values"; then
             APPS="${APPS}lmsclient,"
           fi
@@ -55,176 +58,172 @@ jobs:
             APPS="${APPS}lmsserver,"
           fi
           
-          APPS=${APPS%,}  # Remove trailing comma
+          APPS=${APPS%,}
           
           echo "environment=${ENVIRONMENT}" >> $GITHUB_OUTPUT
           echo "apps=${APPS}" >> $GITHUB_OUTPUT
+          echo "image_version=${IMAGE_VERSION}" >> $GITHUB_OUTPUT
           
           echo "🎯 Environment: ${ENVIRONMENT}"
           echo "📦 Apps: ${APPS}"
+          echo "🐳 Image Version: ${IMAGE_VERSION}"
 
   trigger-argocd-sync:
     name: Trigger ArgoCD Sync
     runs-on: ubuntu-latest
-    needs: detect-environment
-    if: needs.detect-environment.outputs.environment != ''
-    strategy:
-      matrix:
-        app: ${{ fromJson(format('["{0}"]', needs.detect-environment.outputs.apps)) }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.environment != ''
     steps:
       - name: Install ArgoCD CLI
         run: |
           curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
           chmod +x /usr/local/bin/argocd
 
-      - name: Trigger ArgoCD Sync
+      - name: Sync Applications
         env:
           ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
         run: |
-          APP_NAME="els-${matrix.app}-${{ needs.detect-environment.outputs.environment }}"
-          
-          echo "🔄 Syncing ArgoCD application: ${APP_NAME}"
-          
-          argocd app sync ${APP_NAME} \
-            --server ${ARGOCD_SERVER} \
-            --auth-token ${ARGOCD_AUTH_TOKEN} \
-            --grpc-web
+          IFS=',' read -ra APP_ARRAY <<< "${{ needs.detect-changes.outputs.apps }}"
+          for app in "${APP_ARRAY[@]}"; do
+            APP_NAME="els-${app}-${{ needs.detect-changes.outputs.environment }}"
+            echo "🔄 Syncing ArgoCD application: ${APP_NAME}"
+            
+            argocd app sync ${APP_NAME} \
+              --server ${ARGOCD_SERVER} \
+              --auth-token ${ARGOCD_AUTH_TOKEN} \
+              --grpc-web
+          done
 
       - name: Wait for Sync Completion
         env:
           ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
         run: |
-          APP_NAME="els-${matrix.app}-${{ needs.detect-environment.outputs.environment }}"
-          
-          echo "⏳ Waiting for ${APP_NAME} to become healthy..."
-          
-          argocd app wait ${APP_NAME} \
-            --server ${ARGOCD_SERVER} \
-            --auth-token ${ARGOCD_AUTH_TOKEN} \
-            --grpc-web \
-            --health \
-            --timeout 600
-          
-          echo "✅ ${APP_NAME} is healthy and synced"
+          IFS=',' read -ra APP_ARRAY <<< "${{ needs.detect-changes.outputs.apps }}"
+          for app in "${APP_ARRAY[@]}"; do
+            APP_NAME="els-${app}-${{ needs.detect-changes.outputs.environment }}"
+            echo "⏳ Waiting for ${APP_NAME} to become healthy..."
+            
+            argocd app wait ${APP_NAME} \
+              --server ${ARGOCD_SERVER} \
+              --auth-token ${ARGOCD_AUTH_TOKEN} \
+              --grpc-web \
+              --health \
+              --timeout 600
+            
+            echo "✅ ${APP_NAME} is healthy and synced"
+          done
 
   run-karate-tests:
-    name: Run Karate Tests
+    name: Run Karate Tests in Kubernetes
     runs-on: ubuntu-latest
-    needs: [detect-environment, trigger-argocd-sync]
-    if: needs.detect-environment.outputs.environment == 'dev'
+    needs: [detect-changes, trigger-argocd-sync]
+    if: needs.detect-changes.outputs.environment == 'dev'
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'maven'
-
-      - name: Run Karate Tests
-        working-directory: testing/functional/karate
+      - name: Build and Push Karate Test Image
         run: |
-          echo "🧪 Running Karate tests against dev environment..."
-          mvn clean test -Dkarate.env=dev
+          cd testing/functional/karate
+          docker build -t $KARATE_IMAGE:${{ github.sha }} .
+          docker push $KARATE_IMAGE:${{ github.sha }}
 
-      - name: Publish Test Results
+      - name: Deploy Karate Test Job
+        run: |
+          # Create temporary values file for karate tests
+          cat > karate-values.yaml << EOF
+          image:
+            repository: $KARATE_IMAGE
+            tag: ${{ github.sha }}
+          karate:
+            env: dev
+            options: "--tags ~@ignore"
+          test:
+            url: "http://els-lmsserver-dev.els-lms-dev.svc.cluster.local:1337"
+          EOF
+          
+          # Deploy karate test job using helm
+          helm upgrade --install karate-test-${GITHUB_SHA:0:8} \
+            helm/charts/karate-tests \
+            -f karate-values.yaml \
+            --namespace els-lms-dev \
+            --create-namespace
+
+      - name: Wait for Karate Test Completion
+        run: |
+          JOB_NAME="karate-test-${GITHUB_SHA:0:8}"
+          echo "⏳ Waiting for karate test job: $JOB_NAME"
+          
+          # Wait for job completion
+          kubectl wait --for=condition=complete job/$JOB_NAME \
+            --namespace els-lms-dev \
+            --timeout=600s
+          
+          echo "✅ Karate tests completed successfully"
+
+      - name: Get Test Results
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: karate-test-reports
-          path: testing/functional/karate/target/karate-reports/
-
-      - name: Comment Test Results on PR
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            
-            // Try to read karate summary (you may need to adjust path)
-            let summary = '📊 Karate tests executed. Check artifacts for details.';
-            
-            const body = `## 🧪 Karate Test Results\n\n${summary}\n\n[View Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
-            
-            // Find the associated PR
-            const prs = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: `${context.repo.owner}:${context.ref.replace('refs/heads/', '')}`
-            });
-            
-            if (prs.data.length > 0) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prs.data[0].number,
-                body: body
-              });
-            }
+        run: |
+          JOB_NAME="karate-test-${GITHUB_SHA:0:8}"
+          
+          # Get test logs
+          kubectl logs job/$JOB_NAME --namespace els-lms-dev
+          
+          # Extract test results (you might need to get from PVC)
+          echo "📊 Test execution completed"
 
   promote-to-qa:
-    name: Promote to QA
+    name: Promote to QA on Test Success
     runs-on: ubuntu-latest
-    needs: [detect-environment, run-karate-tests]
+    needs: [detect-changes, run-karate-tests]
     if: |
-      needs.detect-environment.outputs.environment == 'dev' &&
-      needs.run-karate-tests.result == 'success' &&
-      github.event_name == 'push'
+      needs.detect-changes.outputs.environment == 'dev' &&
+      needs.run-karate-tests.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Copy dev tags to QA values
+      - name: Copy dev image tag to QA values
         run: |
-          for app in $(echo "${{ needs.detect-environment.outputs.apps }}" | tr ',' ' '); do
-            DEV_FILE="helm/charts/els-${app}/values_dev.yaml"
+          IMAGE_VERSION="${{ needs.detect-changes.outputs.image_version }}"
+          
+          for app in $(echo "${{ needs.detect-changes.outputs.apps }}" | tr ',' ' '); do
             QA_FILE="helm/charts/els-${app}/values_qa.yaml"
             
-            if [ -f "$DEV_FILE" ] && [ -f "$QA_FILE" ]; then
-              TAG=$(grep "tag:" "$DEV_FILE" | head -1 | awk '{print $2}' | tr -d '"')
-              sed -i "s/tag: .*/tag: \"${TAG}\"/" "$QA_FILE"
-              echo "✅ Updated ${app} QA to tag: ${TAG}"
+            if [ -f "$QA_FILE" ]; then
+              sed -i "s|tag:.*|tag: \"${IMAGE_VERSION}\"|" "$QA_FILE"
+              echo "✅ Updated ${app} QA to tag: ${IMAGE_VERSION}"
             fi
           done
 
-      - name: Create PR for QA Promotion
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'chore: promote to QA environment'
-          branch: promote-to-qa
-          delete-branch: true
-          title: '🚀 Promote to QA Environment'
-          body: |
-            ## QA Promotion
-            
-            This PR promotes the following changes to QA:
-            
-            **Apps:** ${{ needs.detect-environment.outputs.apps }}
-            **Source:** Dev environment (tests passed ✅)
-            
-            ### Next Steps:
-            1. Review changes
-            2. Merge to deploy to QA
-            3. Manual testing in QA
-            4. Promote to Prod with approval
-          labels: |
-            qa
-            deployment
+      - name: Commit and push QA updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add helm/charts/*/values_qa.yaml
+          
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes to commit"
+          else
+            git commit -m "ci: promote ${{ needs.detect-changes.outputs.image_version }} to QA [skip ci]"
+            git push origin main
+            echo "✅ Promoted build to QA environment"
+          fi
 
   cd-summary:
     name: CD Summary
     runs-on: ubuntu-latest
-    needs: [detect-environment, trigger-argocd-sync, run-karate-tests]
+    needs: [detect-changes, trigger-argocd-sync, run-karate-tests, promote-to-qa]
     if: always()
     steps:
       - run: |
           echo "## 🚀 CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ needs.detect-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Apps:** ${{ needs.detect-environment.outputs.apps }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Apps:** ${{ needs.detect-changes.outputs.apps }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Version:** ${{ needs.detect-changes.outputs.image_version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**ArgoCD Sync:** ${{ needs.trigger-argocd-sync.result }}" >> $GITHUB_STEP_SUMMARY
           echo "**Karate Tests:** ${{ needs.run-karate-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**QA Promotion:** ${{ needs.promote-to-qa.result }}" >> $GITHUB_STEP_SUMMARY

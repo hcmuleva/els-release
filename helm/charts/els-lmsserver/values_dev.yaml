@@ -2,6 +2,7 @@ elslmsserver:
   enabled: true
   name: els-lmsserver
   image: harishdell/els-lmsserver
+
   tag: "sh_001"
   imagePullPolicy: IfNotPresent
   containerPort: 1337

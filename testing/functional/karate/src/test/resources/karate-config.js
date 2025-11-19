@@ -1,6 +1,8 @@
 function fn() {
   var config = {};
   // Base URL of your Flask API
+  //config.baseUrl = 'http://dev-els-lmsserver.local/api';
+
   config.baseUrl = 'http://dev-els-lmsserver.local/api';
 
   // Default headers

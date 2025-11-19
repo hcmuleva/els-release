@@ -15,6 +15,7 @@ Scenario: Registration created the user
   And request { identifier: '#(email)', password: '#(password)' }
   When method post
   Then status 200
+  
 
 Scenario: Login returns valid token
   Given path 'auth/local'

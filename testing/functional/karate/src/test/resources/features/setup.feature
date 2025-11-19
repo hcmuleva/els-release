@@ -4,12 +4,13 @@ Background:
   * url baseUrl
   * configure headers = headers
 
+@api_suite @regression @auth @register
 Scenario: Register and login user
   * def rand = java.util.UUID.randomUUID().toString()
   * def username = 'user_' + rand
   * def email = username + '@a.com'
   * def password = 'secret'
-
+  
   # Register user
   Given path 'auth/local/register'
   And request { username: '#(username)', email: '#(email)', password: '#(password)'}

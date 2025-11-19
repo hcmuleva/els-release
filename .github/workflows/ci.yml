@@ -204,40 +204,33 @@ jobs:
     needs: [get-version, build-lmsclient, build-lmsserver, merge-to-main]
     if: always()
     steps:
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            const version = '${{ needs.get-version.outputs.version }}';
-            const sequence = '${{ needs.get-version.outputs.sequence }}';
-            const merged = '${{ needs.merge-to-main.result }}' === 'success';
-            
-            let body = `## 🚀 CI Pipeline Summary\n\n`;
-            body += `**Build Version:** \`${version}\`\n`;
-            body += `**Sequence Number:** \`${sequence}\`\n`;
-            body += `**Main Branch Updated:** ${merged ? '✅ Yes' : '❌ No'}\n\n`;
-            body += `### 📦 Built Images:\n`;
-            
-            if ('${{ needs.build-lmsclient.result }}' === 'success') {
-              body += `- ✅ \`els-lmsclient:${version}\`\n`;
-            }
-            if ('${{ needs.build-lmsserver.result }}' === 'success') {
-              body += `- ✅ \`els-lmsserver:${version}\`\n`;
-            }
-            
-            if (merged) {
-              body += `\n### ✅ CD Pipeline Triggered:\n`;
-              body += `1. ✅ values_dev.yaml updated on main branch\n`;
-              body += `2. 🔄 ArgoCD will auto-detect changes\n`;
-              body += `3. 🚀 Automatic deployment to **dev** environment\n`;
-              body += `4. 🧪 Karate tests will run post-deployment\n`;
-            } else {
-              body += `\n### ❌ CD Pipeline Not Triggered:\n`;
-              body += `CI pipeline did not complete successfully\n`;
-            }
-            
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
+      - name: Create Workflow Summary
+        run: |
+          echo "## 🚀 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Version:** \`${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Sequence Number:** \`${{ needs.get-version.outputs.sequence }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Main Branch Updated:** ${{ needs.merge-to-main.result == 'success' && '✅ Yes' || '❌ No' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Built Images:" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.build-lmsclient.result }}" == "success" ]; then
+            echo "- ✅ \`els-lmsclient:${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.build-lmsserver.result }}" == "success" ]; then
+            echo "- ✅ \`els-lmsserver:${{ needs.get-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.merge-to-main.result }}" == "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ CD Pipeline Triggered:" >> $GITHUB_STEP_SUMMARY
+            echo "1. ✅ values_dev.yaml updated on main branch" >> $GITHUB_STEP_SUMMARY
+            echo "2. 🔄 ArgoCD will auto-detect changes" >> $GITHUB_STEP_SUMMARY
+            echo "3. 🚀 Automatic deployment to **dev** environment" >> $GITHUB_STEP_SUMMARY
+            echo "4. 🧪 Karate tests will run post-deployment" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ❌ CD Pipeline Not Triggered:" >> $GITHUB_STEP_SUMMARY
+            echo "CI pipeline did not complete successfully" >> $GITHUB_STEP_SUMMARY
+          fi
