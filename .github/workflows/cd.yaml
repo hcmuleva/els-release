@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  contents: write
   pull-requests: write
 
 env:
@@ -20,16 +21,20 @@ env:
 jobs:
   detect-changes:
     name: Detect Environment Changes
+  detect-changes:
+    name: Detect Environment Changes
     runs-on: ubuntu-latest
     outputs:
       environment: ${{ steps.detect.outputs.environment }}
       apps: ${{ steps.detect.outputs.apps }}
+      image_version: ${{ steps.detect.outputs.image_version }}
       image_version: ${{ steps.detect.outputs.image_version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
+      - name: Detect changes and extract image version
       - name: Detect changes and extract image version
         id: detect
         run: |
@@ -40,17 +45,23 @@ jobs:
           ENVIRONMENT=""
           APPS=""
           IMAGE_VERSION=""
+          IMAGE_VERSION=""
           
+          # Check which values file changed
           # Check which values file changed
           if echo "$CHANGED_FILES" | grep -q "values_dev.yaml"; then
             ENVIRONMENT="dev"
             # Extract image version from values_dev.yaml
             IMAGE_VERSION=$(grep "tag:" helm/charts/els-lmsserver/values_dev.yaml | head -1 | awk -F'"' '{print $2}')
+            # Extract image version from values_dev.yaml
+            IMAGE_VERSION=$(grep "tag:" helm/charts/els-lmsserver/values_dev.yaml | head -1 | awk -F'"' '{print $2}')
           elif echo "$CHANGED_FILES" | grep -q "values_qa.yaml"; then
             ENVIRONMENT="qa"
             IMAGE_VERSION=$(grep "tag:" helm/charts/els-lmsserver/values_qa.yaml | head -1 | awk -F'"' '{print $2}')
+            IMAGE_VERSION=$(grep "tag:" helm/charts/els-lmsserver/values_qa.yaml | head -1 | awk -F'"' '{print $2}')
           fi
           
+          # Detect which apps changed
           # Detect which apps changed
           if echo "$CHANGED_FILES" | grep -q "els-lmsclient/values"; then
             APPS="${APPS}lmsclient,"
@@ -60,18 +71,23 @@ jobs:
           fi
           
           APPS=${APPS%,}
+          APPS=${APPS%,}
           
           echo "environment=${ENVIRONMENT}" >> $GITHUB_OUTPUT
           echo "apps=${APPS}" >> $GITHUB_OUTPUT
+          echo "image_version=${IMAGE_VERSION}" >> $GITHUB_OUTPUT
           echo "image_version=${IMAGE_VERSION}" >> $GITHUB_OUTPUT
           
           echo "🎯 Environment: ${ENVIRONMENT}"
           echo "📦 Apps: ${APPS}"
           echo "🐳 Image Version: ${IMAGE_VERSION}"
+          echo "🐳 Image Version: ${IMAGE_VERSION}"
 
   trigger-argocd-sync:
     name: Trigger ArgoCD Sync
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.environment != ''
     needs: detect-changes
     if: needs.detect-changes.outputs.environment != ''
     steps:
@@ -115,12 +131,43 @@ jobs:
           done
   run-karate-tests:
     name: Run Karate Tests in Kubernetes
+    name: Run Karate Tests in Kubernetes
     runs-on: ubuntu-latest
+    needs: [detect-changes, trigger-argocd-sync]
+    if: needs.detect-changes.outputs.environment == 'dev'
     needs: [detect-changes, trigger-argocd-sync]
     if: needs.detect-changes.outputs.environment == 'dev'
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build and Push Karate Test Image
+        run: |
+          cd testing/functional/karate
+          docker build -t $KARATE_IMAGE:${{ github.sha }} .
+          docker push $KARATE_IMAGE:${{ github.sha }}
+
+      - name: Deploy Karate Test Job
+        run: |
+          # Create temporary values file for karate tests
+          cat > karate-values.yaml << EOF
+          image:
+            repository: $KARATE_IMAGE
+            tag: ${{ github.sha }}
+          karate:
+            env: dev
+            options: "--tags ~@ignore"
+          test:
+            url: "http://els-lmsserver-dev.els-lms-dev.svc.cluster.local:1337"
+          EOF
+          
+          # Deploy karate test job using helm
+          helm upgrade --install karate-test-${GITHUB_SHA:0:8} \
+            helm/charts/karate-tests \
+            -f karate-values.yaml \
+            --namespace els-lms-dev \
+            --create-namespace
+
+      - name: Wait for Karate Test Completion
       - name: Build and Push Karate Test Image
         run: |
           cd testing/functional/karate
@@ -161,7 +208,26 @@ jobs:
           echo "✅ Karate tests completed successfully"
 
       - name: Get Test Results
+          JOB_NAME="karate-test-${GITHUB_SHA:0:8}"
+          echo "⏳ Waiting for karate test job: $JOB_NAME"
+          
+          # Wait for job completion
+          kubectl wait --for=condition=complete job/$JOB_NAME \
+            --namespace els-lms-dev \
+            --timeout=600s
+          
+          echo "✅ Karate tests completed successfully"
+
+      - name: Get Test Results
         if: always()
+        run: |
+          JOB_NAME="karate-test-${GITHUB_SHA:0:8}"
+          
+          # Get test logs
+          kubectl logs job/$JOB_NAME --namespace els-lms-dev
+          
+          # Extract test results (you might need to get from PVC)
+          echo "📊 Test execution completed"
         run: |
           JOB_NAME="karate-test-${GITHUB_SHA:0:8}"
           
@@ -173,9 +239,13 @@ jobs:
 
   promote-to-qa:
     name: Promote to QA on Test Success
+    name: Promote to QA on Test Success
     runs-on: ubuntu-latest
     needs: [detect-changes, run-karate-tests]
+    needs: [detect-changes, run-karate-tests]
     if: |
+      needs.detect-changes.outputs.environment == 'dev' &&
+      needs.run-karate-tests.result == 'success'
       needs.detect-changes.outputs.environment == 'dev' &&
       needs.run-karate-tests.result == 'success'
     steps:
@@ -184,12 +254,19 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Copy dev image tag to QA values
+      - name: Copy dev image tag to QA values
         run: |
+          IMAGE_VERSION="${{ needs.detect-changes.outputs.image_version }}"
+          
+          for app in $(echo "${{ needs.detect-changes.outputs.apps }}" | tr ',' ' '); do
           IMAGE_VERSION="${{ needs.detect-changes.outputs.image_version }}"
           
           for app in $(echo "${{ needs.detect-changes.outputs.apps }}" | tr ',' ' '); do
             QA_FILE="helm/charts/els-${app}/values_qa.yaml"
             
+            if [ -f "$QA_FILE" ]; then
+              sed -i "s|tag:.*|tag: \"${IMAGE_VERSION}\"|" "$QA_FILE"
+              echo "✅ Updated ${app} QA to tag: ${IMAGE_VERSION}"
             if [ -f "$QA_FILE" ]; then
               sed -i "s|tag:.*|tag: \"${IMAGE_VERSION}\"|" "$QA_FILE"
               echo "✅ Updated ${app} QA to tag: ${IMAGE_VERSION}"
@@ -210,10 +287,25 @@ jobs:
             git push origin main
             echo "✅ Promoted build to QA environment"
           fi
+      - name: Commit and push QA updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add helm/charts/*/values_qa.yaml
+          
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes to commit"
+          else
+            git commit -m "ci: promote ${{ needs.detect-changes.outputs.image_version }} to QA [skip ci]"
+            git push origin main
+            echo "✅ Promoted build to QA environment"
+          fi
 
   cd-summary:
     name: CD Summary
     runs-on: ubuntu-latest
+    needs: [detect-changes, trigger-argocd-sync, run-karate-tests, promote-to-qa]
     needs: [detect-changes, trigger-argocd-sync, run-karate-tests, promote-to-qa]
     if: always()
     steps:
@@ -223,7 +315,11 @@ jobs:
           echo "**Environment:** ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "**Apps:** ${{ needs.detect-changes.outputs.apps }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image Version:** ${{ needs.detect-changes.outputs.image_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.detect-changes.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Apps:** ${{ needs.detect-changes.outputs.apps }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Version:** ${{ needs.detect-changes.outputs.image_version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**ArgoCD Sync:** ${{ needs.trigger-argocd-sync.result }}" >> $GITHUB_STEP_SUMMARY
           echo "**Karate Tests:** ${{ needs.run-karate-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**QA Promotion:** ${{ needs.promote-to-qa.result }}" >> $GITHUB_STEP_SUMMARY
           echo "**QA Promotion:** ${{ needs.promote-to-qa.result }}" >> $GITHUB_STEP_SUMMARY
