@@ -18,7 +18,7 @@ env:
   ARGOCD_NAMESPACE: argocd
   KARATE_IMAGE: harishdell/karate:1.0
 
-  
+
 jobs:
   detect-changes:
     name: Detect Environment Changes
@@ -207,17 +207,7 @@ jobs:
             --timeout=600s
           
           echo "✅ Karate tests completed successfully"
-
-      - name: Get Test Results
-          JOB_NAME="karate-test-${GITHUB_SHA:0:8}"
-          echo "⏳ Waiting for karate test job: $JOB_NAME"
-          
-          # Wait for job completion
-          kubectl wait --for=condition=complete job/$JOB_NAME \
-            --namespace els-lms-dev \
-            --timeout=600s
-          
-          echo "✅ Karate tests completed successfully"
+       
 
       - name: Get Test Results
         if: always()
