@@ -13,8 +13,9 @@ permissions:
   pull-requests: write
 
 env:
-  ARGOCD_SERVER: argocd.your-domain.com
-  KARATE_IMAGE: your-registry/karate-tests
+  ARGOCD_SERVER: http://argocd.local/
+  ARGOCD_NAMESPACE: argocd
+  KARATE_IMAGE: harishdell/karate:1.0
 
 jobs:
   detect-changes:
@@ -79,9 +80,15 @@ jobs:
           curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
           chmod +x /usr/local/bin/argocd
 
+      - name: Login to ArgoCD
+        run: |
+          argocd login ${{ env.ARGOCD_SERVER }} \
+            --username ${{ secrets.ARGOCD_USERNAME }} \
+            --password ${{ secrets.ARGOCD_PASSWORD }} \
+            --grpc-web \
+            --insecure  # Add this if using self-signed certificates
+
       - name: Sync Applications
-        env:
-          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
         run: |
           IFS=',' read -ra APP_ARRAY <<< "${{ needs.detect-changes.outputs.apps }}"
           for app in "${APP_ARRAY[@]}"; do
@@ -89,14 +96,10 @@ jobs:
             echo "🔄 Syncing ArgoCD application: ${APP_NAME}"
             
             argocd app sync ${APP_NAME} \
-              --server ${ARGOCD_SERVER} \
-              --auth-token ${ARGOCD_AUTH_TOKEN} \
-              --grpc-web
+              --grpc-web  # Force gRPC-web protocol
           done
 
       - name: Wait for Sync Completion
-        env:
-          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
         run: |
           IFS=',' read -ra APP_ARRAY <<< "${{ needs.detect-changes.outputs.apps }}"
           for app in "${APP_ARRAY[@]}"; do
@@ -104,15 +107,12 @@ jobs:
             echo "⏳ Waiting for ${APP_NAME} to become healthy..."
             
             argocd app wait ${APP_NAME} \
-              --server ${ARGOCD_SERVER} \
-              --auth-token ${ARGOCD_AUTH_TOKEN} \
               --grpc-web \
               --health \
               --timeout 600
             
             echo "✅ ${APP_NAME} is healthy and synced"
           done
-
   run-karate-tests:
     name: Run Karate Tests in Kubernetes
     runs-on: ubuntu-latest
