@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'release/devops/level-3/helm/values.yaml' # Prevent infinite loop
+      - 'devops/level-3/helm/values.yaml' # Prevent infinite loop
       - 'README.md'
       - '.github/**'
 
@@ -31,13 +31,13 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: release/development/level-3/server
+          context: development/level-3/server
           push: true
           tags: harishdell/elsapi:prod-${{ github.sha }}
 
       - name: Update Helm values
         run: |
-          cd release/devops/level-3/helm
+          cd devops/level-3/helm
           # Update the tag in values.yaml
           sed -i "s/tag: .*/tag: \"prod-${{ github.sha }}\"/" values.yaml
           
@@ -45,6 +45,6 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add release/devops/level-3/helm/values.yaml
+          git add devops/level-3/helm/values.yaml
           git commit -m "chore: update image tag to prod-${{ github.sha }} [skip ci]"
           git push
