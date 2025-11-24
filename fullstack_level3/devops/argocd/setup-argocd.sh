@@ -17,7 +17,7 @@ echo "🚀 Starting ArgoCD Setup..."
 # 1. Create Namespaces
 echo "📦 Creating namespaces..."
 kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f -
-kubectl create namespace prod --dry-run=client -o yaml | kubectl apply -f -
+# kubectl create namespace prod --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 
 # 2. Add Repository Credentials
@@ -36,19 +36,19 @@ kubectl label secret repo-credentials -n argocd "argocd.argoproj.io/secret-type=
 # 3. Apply Projects
 echo "📂 Applying AppProjects..."
 kubectl apply -f projects/dev.yaml
-kubectl apply -f projects/prod.yaml
+# kubectl apply -f projects/prod.yaml
 
 # 4. Apply Applications
 echo "🚀 Applying Applications..."
 kubectl apply -f applications/els-client-dev.yaml
-kubectl apply -f applications/els-client-prod.yaml
+# kubectl apply -f applications/els-client-prod.yaml
 kubectl apply -f applications/els-server-dev.yaml
-kubectl apply -f applications/els-server-prod.yaml
+# kubectl apply -f applications/els-server-prod.yaml
 
 echo "✅ ArgoCD Setup Complete!"
 echo "   Dev Namespace:"
 echo "     - https://argocd.local/applications/els-client-dev"
 echo "     - https://argocd.local/applications/els-server-dev"
-echo "   Prod Namespace:"
-echo "     - https://argocd.local/applications/els-client-prod"
-echo "     - https://argocd.local/applications/els-server-prod"
+# echo "   Prod Namespace:"
+# echo "     - https://argocd.local/applications/els-client-prod"
+# echo "     - https://argocd.local/applications/els-server-prod"
