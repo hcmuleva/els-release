@@ -46,8 +46,8 @@ kubectl apply -f projects/server-prod.yaml
 echo "🚀 Applying Applications..."
 kubectl apply -f applications/client-dev.yaml
 kubectl apply -f applications/client-prod.yaml
-kubectl apply -f applications/dev.yaml
-kubectl apply -f applications/prod.yaml
+kubectl apply -f applications/server-dev.yaml
+kubectl apply -f applications/server-prod.yaml
 
 echo "✅ ArgoCD Setup Complete!"
 echo "   Client Apps:"
