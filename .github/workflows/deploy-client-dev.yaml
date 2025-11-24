@@ -55,9 +55,7 @@ jobs:
         with:
           context: fullstack_level3/development/client
           push: true
-          tags: harishdell/els-client:${{ env.VERSION }}-${{ github.run_number }}
-          build-args: |
-            REACT_APP_API_URL=${{ env.SERVER_URL }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/elsclient:${{ env.VERSION }}
 
       - name: Checkout Dev Branch
         run: |

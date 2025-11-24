@@ -19,11 +19,10 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
-        - containerPort: {{ .Values.service.targetPort }}
-        {{- if .Values.env }}
+          - name: http
+            containerPort: 80
+            protocol: TCP
         env:
-        {{- range $key, $value := .Values.env }}
-        - name: {{ $key }}
-          value: {{ $value | quote }}
-        {{- end }}
-        {{- end }}
+          - name: VITE_API_URL
+            value: {{ .Values.serverUrl | quote }}
+        livenessProbe:

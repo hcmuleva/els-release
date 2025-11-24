@@ -18,7 +18,11 @@ RUN npm run build
 # Stage 2: Serve the production build with NGINX
 FROM nginx:stable-alpine
 
-# Copy built React app (Vite outputs to dist/)
+# Copy the env.sh script
+COPY env.sh /docker-entrypoint.d/env.sh
+RUN chmod +x /docker-entrypoint.d/env.sh
+
+# Copy built assets from builder stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
@@ -28,4 +32,5 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 RUN chown -R nginx:nginx /usr/share/nginx/html
 
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/bin/sh", "-c", "/docker-entrypoint.d/env.sh && nginx -g 'daemon off;'"]
+```

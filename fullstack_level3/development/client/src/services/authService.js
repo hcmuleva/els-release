@@ -4,8 +4,7 @@
 // ========================================
 
 import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://192.168.18.84:1337/api";
+import { API_URL } from "../config";
 
 /**
  * WHAT IS JWT (JSON Web Token)?

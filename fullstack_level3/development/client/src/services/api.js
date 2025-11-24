@@ -4,6 +4,7 @@
 // ========================================
 
 import axios from "axios";
+import { API_URL } from "../config";
 
 /**
  * WHAT IS AXIOS?
@@ -20,7 +21,7 @@ import axios from "axios";
 
 // Create axios instance with default configuration
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://192.168.18.84:1337/api",
+  baseURL: API_URL || "http://192.168.18.84:1337/api",
   timeout: 10000, // 10 seconds
   headers: {
     "Content-Type": "application/json",
