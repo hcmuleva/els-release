@@ -33,14 +33,21 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Read version and server URL
+      - name: Bump version and read config
         id: get_config
         run: |
-          VERSION=$(jq -r .version fullstack_level3/development/client/package.json)
-          SERVER_URL=$(yq e '.serverUrl' fullstack_level3/devops/helm/client/values.yaml)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          cd fullstack_level3/development/client
+          # Auto-increment patch version
+          CURRENT_VERSION=$(jq -r .version package.json)
+          NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+          jq ".version = \"$NEW_VERSION\"" package.json > package.json.tmp && mv package.json.tmp package.json
+          echo "Bumped version from $CURRENT_VERSION to $NEW_VERSION"
+          
+          cd ../..
+          SERVER_URL=$(yq e '.serverUrl' devops/helm/client/values.yaml)
+          echo "VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "SERVER_URL=$SERVER_URL" >> $GITHUB_ENV
-          echo "Detected version: $VERSION"
+          echo "Detected version: $NEW_VERSION"
           echo "Server URL: $SERVER_URL"
 
       - name: Build and push Docker image
@@ -67,6 +74,6 @@ jobs:
           
       - name: Commit and Push changes to Dev
         run: |
-          git add fullstack_level3/devops/helm/client/values.yaml
-          git commit -m "chore: update client image tag to ${{ env.VERSION }}-${{ github.run_number }} from ${{ github.ref_name }} [skip ci]" || echo "No changes to commit"
+          git add fullstack_level3/devops/helm/client/values.yaml fullstack_level3/development/client/package.json
+          git commit -m "chore: bump client to v${{ env.VERSION }} and update image tag to ${{ env.VERSION }}-${{ github.run_number }} from ${{ github.ref_name }} [skip ci]" || echo "No changes to commit"
           git push origin dev

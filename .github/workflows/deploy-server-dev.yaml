@@ -33,12 +33,16 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Read version from package.json
+      - name: Bump version
         id: get_version
         run: |
-          VERSION=$(jq -r .version fullstack_level3/development/server/package.json)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Detected version: $VERSION"
+          cd fullstack_level3/development/server
+          # Auto-increment patch version
+          CURRENT_VERSION=$(jq -r .version package.json)
+          NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+          jq ".version = \"$NEW_VERSION\"" package.json > package.json.tmp && mv package.json.tmp package.json
+          echo "Bumped version from $CURRENT_VERSION to $NEW_VERSION"
+          echo "VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -63,6 +67,6 @@ jobs:
           
       - name: Commit and Push changes to Dev
         run: |
-          git add fullstack_level3/devops/helm/server/values.yaml
-          git commit -m "chore: update server image tag to ${{ env.VERSION }}-${{ github.run_number }} from ${{ github.ref_name }} [skip ci]" || echo "No changes to commit"
+          git add fullstack_level3/devops/helm/server/values.yaml fullstack_level3/development/server/package.json
+          git commit -m "chore: bump server to v${{ env.VERSION }} and update image tag to ${{ env.VERSION }}-${{ github.run_number }} from ${{ github.ref_name }} [skip ci]" || echo "No changes to commit"
           git push origin dev
