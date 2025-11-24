@@ -17,5 +17,5 @@ ingress:
         - path: /
           pathType: Prefix
 # Server URL that will be passed to React app at build time
-serverUrl: "http://els-api.local"
+serverUrl: "http://dev.els-api.local"
 env: {}
