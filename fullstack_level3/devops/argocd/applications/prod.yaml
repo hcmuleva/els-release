@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: strapi-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: strapi-prod
+  source:
+    repoURL: https://github.com/hcmuleva/els-release.git
+    targetRevision: main
+    path: fullstack_level3/devops/helm
+    helm:
+      valueFiles:
+      - values.yaml
+      parameters:
+      - name: env.NODE_ENV
+        value: production
+      - name: ingress.hosts[0].host
+        value: prod.els-api.local
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

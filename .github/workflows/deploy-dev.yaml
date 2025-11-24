@@ -5,7 +5,7 @@ on:
     branches:
       - dev
     paths-ignore:
-      - 'devops/level-3/helm/values.yaml' # Prevent infinite loop
+      - 'fullstack_level3/devops/helm/values.yaml' # Prevent infinite loop
       - 'README.md'
       - '.github/**'
 
@@ -28,23 +28,30 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Read version from package.json
+        id: get_version
+        run: |
+          VERSION=$(jq -r .version fullstack_level3/development/server/package.json)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Detected version: $VERSION"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: development/level-3/server
+          context: fullstack_level3/development/server
           push: true
-          tags: harishdell/elsapi:dev-${{ github.sha }}
+          tags: harishdell/elsapi:${{ env.VERSION }}:${{ github.run_number }}
 
       - name: Update Helm values
         run: |
-          cd devops/level-3/helm
+          cd fullstack_level3/devops/helm
           # Update the tag in values.yaml
-          sed -i "s/tag: .*/tag: \"dev-${{ github.sha }}\"/" values.yaml
+          sed -i "s/tag: .*/tag: \"${{ env.VERSION }}:${{ github.run_number }}\"/" values.yaml
           
       - name: Commit and Push changes
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add devops/level-3/helm/values.yaml
-          git commit -m "chore: update image tag to dev-${{ github.sha }} [skip ci]"
+          git add fullstack_level3/devops/helm/values.yaml
+          git commit -m "chore: update image tag to ${{ env.VERSION }}:${{ github.run_number }} [skip ci]"
           git push
