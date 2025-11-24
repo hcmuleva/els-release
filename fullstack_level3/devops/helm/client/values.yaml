@@ -1,7 +1,7 @@
 replicaCount: 1
 image:
   repository: harishdell/els-client
-  tag: "0.0.7-12"
+  tag: "0.0.8-13"
   pullPolicy: IfNotPresent
 service:
   type: ClusterIP
