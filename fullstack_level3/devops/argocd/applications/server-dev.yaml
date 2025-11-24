@@ -6,7 +6,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: server-dev
+  project: dev
   source:
     repoURL: https://github.com/hcmuleva/els-release.git
     targetRevision: dev
@@ -18,7 +18,7 @@ spec:
       - name: env.NODE_ENV
         value: development
       - name: ingress.hosts[0].host
-        value: project: dev
+        value: dev.els-api.local
   destination:
     server: https://kubernetes.default.svc
     namespace: dev
@@ -27,4 +27,4 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      
+    - CreateNamespace=true
