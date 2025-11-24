@@ -55,7 +55,7 @@ jobs:
         with:
           context: fullstack_level3/development/client
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/elsclient:${{ env.VERSION }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/els-client:${{ env.VERSION }}-${{ github.run_number }}
 
       - name: Checkout Dev Branch
         run: |
