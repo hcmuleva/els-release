@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: client-dev
+  namespace: argocd
+spec:
+  project: client-dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: client-dev
+  source:
+    repoURL: https://github.com/hcmuleva/els-release.git
+    targetRevision: dev
+    path: fullstack_level3/devops/helm/client
+    helm:
+      valueFiles:
+      - values.yaml
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

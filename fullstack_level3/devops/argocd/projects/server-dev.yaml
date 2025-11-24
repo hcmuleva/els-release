@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: server-dev
+  namespace: argocd
+spec:
+  description: Server Development Environment
+  sourceRepos:
+    - 'https://github.com/hcmuleva/els-release.git'
+  destinations:
+    - namespace: server-dev
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

@@ -1,12 +1,12 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: strapi-prod
+  name: server-prod
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: strapi-prod
+  project: server-prod
   source:
     repoURL: https://github.com/hcmuleva/els-release.git
     targetRevision: main
@@ -21,7 +21,7 @@ spec:
         value: prod.els-api.local
   destination:
     server: https://kubernetes.default.svc
-    namespace: prod
+    namespace: server-prod
   syncPolicy:
     automated:
       prune: true
