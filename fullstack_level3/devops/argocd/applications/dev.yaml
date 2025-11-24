@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/hcmuleva/els-release.git
     targetRevision: dev
-    path: fullstack_level3/devops/helm
+    path: fullstack_level3/devops/helm/server
     helm:
       valueFiles:
       - values.yaml

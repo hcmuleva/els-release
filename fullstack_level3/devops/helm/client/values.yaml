@@ -1,0 +1,26 @@
+replicaCount: 1
+
+image:
+  repository: harishdell/els-client
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: els-client.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Server URL that will be passed to React app at build time
+serverUrl: "http://els-api.local"
+
+env: {}

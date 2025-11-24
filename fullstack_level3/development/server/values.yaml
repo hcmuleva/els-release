@@ -1,0 +1,31 @@
+replicaCount: 1
+
+image:
+  repository: harishdell/elsapi
+  pullPolicy: IfNotPresent
+  tag: "1.0.2-3"
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 1337
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+  hosts:
+    - host: els-api.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  NODE_ENV: development
+
+sidecars: []
+
+  # - name: monitoring-sidecar
+  #   image: busybox
+  #   command: ['sh', '-c', 'while true; do echo "Monitoring..."; sleep 30; done']
