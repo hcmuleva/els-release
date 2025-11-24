@@ -11,6 +11,7 @@ on:
     paths:
       - 'fullstack_level3/development/client/**'
       - 'fullstack_level3/devops/helm/client/**'
+      - '.github/workflows/deploy-client-dev.yaml'
 
 jobs:
   build-and-deploy:
