@@ -3,7 +3,7 @@ replicaCount: 1
 image:
   repository: harishdell/elsapi
   pullPolicy: IfNotPresent
-  tag: "1.0.5-3"
+  tag: "1.0.6-4"
 
 service:
   type: ClusterIP
