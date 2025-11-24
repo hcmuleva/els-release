@@ -33,4 +33,3 @@ RUN chown -R nginx:nginx /usr/share/nginx/html
 
 EXPOSE 80
 CMD ["/bin/sh", "-c", "/docker-entrypoint.d/env.sh && nginx -g 'daemon off;'"]
-```
