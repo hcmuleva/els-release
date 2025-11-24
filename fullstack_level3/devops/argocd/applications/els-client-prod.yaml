@@ -1,16 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: client-dev
+  name: els-client-prod
   namespace: argocd
 spec:
-  project: dev
+  project: prod
   destination:
     server: https://kubernetes.default.svc
-    namespace: dev
+    namespace: prod
   source:
     repoURL: https://github.com/hcmuleva/els-release.git
-    targetRevision: dev
+    targetRevision: main
     path: fullstack_level3/devops/helm/client
     helm:
       valueFiles:

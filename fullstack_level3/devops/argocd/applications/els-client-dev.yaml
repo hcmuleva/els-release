@@ -1,27 +1,20 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: server-dev
+  name: els-client-dev
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
 spec:
   project: dev
-  source:
-    repoURL: https://github.com/hcmuleva/els-release.git
-    targetRevision: dev
-    path: fullstack_level3/devops/helm/server
-    helm:
-      valueFiles:
-      - values.yaml
-      parameters:
-      - name: env.NODE_ENV
-        value: development
-      - name: ingress.hosts[0].host
-        value: dev.els-api.local
   destination:
     server: https://kubernetes.default.svc
     namespace: dev
+  source:
+    repoURL: https://github.com/hcmuleva/els-release.git
+    targetRevision: dev
+    path: fullstack_level3/devops/helm/client
+    helm:
+      valueFiles:
+      - values.yaml
   syncPolicy:
     automated:
       prune: true

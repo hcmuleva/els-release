@@ -40,15 +40,15 @@ kubectl apply -f projects/prod.yaml
 
 # 4. Apply Applications
 echo "🚀 Applying Applications..."
-kubectl apply -f applications/client-dev.yaml
-kubectl apply -f applications/client-prod.yaml
-kubectl apply -f applications/server-dev.yaml
-kubectl apply -f applications/server-prod.yaml
+kubectl apply -f applications/els-client-dev.yaml
+kubectl apply -f applications/els-client-prod.yaml
+kubectl apply -f applications/els-server-dev.yaml
+kubectl apply -f applications/els-server-prod.yaml
 
 echo "✅ ArgoCD Setup Complete!"
-echo "   Dev Namespace (client-dev + server-dev):"
-echo "     - https://argocd.local/applications/client-dev"
-echo "     - https://argocd.local/applications/server-dev"
-echo "   Prod Namespace (client-prod + server-prod):"
-echo "     - https://argocd.local/applications/client-prod"
-echo "     - https://argocd.local/applications/server-prod"
+echo "   Dev Namespace:"
+echo "     - https://argocd.local/applications/els-client-dev"
+echo "     - https://argocd.local/applications/els-server-dev"
+echo "   Prod Namespace:"
+echo "     - https://argocd.local/applications/els-client-prod"
+echo "     - https://argocd.local/applications/els-server-prod"
