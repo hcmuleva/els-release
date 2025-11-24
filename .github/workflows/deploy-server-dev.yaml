@@ -1,4 +1,4 @@
-name: Deploy to Dev
+name: Deploy Server to Dev
 
 on:
   push:
@@ -8,10 +8,9 @@ on:
       - 'fix/**'
       - 'page/**'
       - 'bugs/**'
-    paths-ignore:
-      - 'fullstack_level3/devops/helm/values.yaml' # Prevent infinite loop
-      - 'README.md'
-      - '.github/**'
+    paths:
+      - 'fullstack_level3/development/server/**'
+      - 'fullstack_level3/devops/helm/server/**'
 
 jobs:
   build-and-deploy:
@@ -58,12 +57,12 @@ jobs:
 
       - name: Update Helm values
         run: |
-          cd fullstack_level3/devops/helm
+          cd fullstack_level3/devops/helm/server
           # Update the tag in values.yaml
           sed -i "s/tag: .*/tag: \"${{ env.VERSION }}-${{ github.run_number }}\"/" values.yaml
           
       - name: Commit and Push changes to Dev
         run: |
-          git add fullstack_level3/devops/helm/values.yaml
-          git commit -m "chore: update image tag to ${{ env.VERSION }}-${{ github.run_number }} from ${{ github.ref_name }} [skip ci]"
+          git add fullstack_level3/devops/helm/server/values.yaml
+          git commit -m "chore: update server image tag to ${{ env.VERSION }}-${{ github.run_number }} from ${{ github.ref_name }} [skip ci]" || echo "No changes to commit"
           git push origin dev

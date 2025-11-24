@@ -1,0 +1,72 @@
+name: Deploy Client to Dev
+
+on:
+  push:
+    branches:
+      - dev
+      - 'feature/**'
+      - 'fix/**'
+      - 'page/**'
+      - 'bugs/**'
+    paths:
+      - 'fullstack_level3/development/client/**'
+      - 'fullstack_level3/devops/helm/client/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Read version and server URL
+        id: get_config
+        run: |
+          VERSION=$(jq -r .version fullstack_level3/development/client/package.json)
+          SERVER_URL=$(yq e '.serverUrl' fullstack_level3/devops/helm/client/values.yaml)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "SERVER_URL=$SERVER_URL" >> $GITHUB_ENV
+          echo "Detected version: $VERSION"
+          echo "Server URL: $SERVER_URL"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: fullstack_level3/development/client
+          push: true
+          tags: harishdell/els-client:${{ env.VERSION }}-${{ github.run_number }}
+          build-args: |
+            REACT_APP_API_URL=${{ env.SERVER_URL }}
+
+      - name: Checkout Dev Branch
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git fetch origin dev
+          git checkout dev
+          git pull origin dev
+
+      - name: Update Helm values
+        run: |
+          cd fullstack_level3/devops/helm/client
+          yq e -i ".image.tag = \"${{ env.VERSION }}-${{ github.run_number }}\"" values.yaml
+          
+      - name: Commit and Push changes to Dev
+        run: |
+          git add fullstack_level3/devops/helm/client/values.yaml
+          git commit -m "chore: update client image tag to ${{ env.VERSION }}-${{ github.run_number }} from ${{ github.ref_name }} [skip ci]" || echo "No changes to commit"
+          git push origin dev
