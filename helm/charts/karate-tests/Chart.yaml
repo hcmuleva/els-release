@@ -1,6 +1,0 @@
-apiVersion: v2
-name: karate-tests
-description: Karate API Test Runner
-type: application
-version: 0.1.0
-appVersion: "1.0"

@@ -1,5 +1,0 @@
-apiVersion: v2
-name: els-lmsserver
-description: Strapi API server for ELS LMS application
-version: 0.1.0
-appVersion: "1.12"

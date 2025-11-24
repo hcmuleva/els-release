@@ -1,8 +1,0 @@
-version: "3.8"
-
-services:
-  karate-tests:
-    build: .
-    environment:
-      KARATE_ENV: "dev"
-      KARATE_TAGS: "@smoke"
