@@ -25,6 +25,7 @@ env:
   NODE_ENV: development
 
 sidecars: []
+
   # - name: monitoring-sidecar
   #   image: busybox
   #   command: ['sh', '-c', 'while true; do echo "Monitoring..."; sleep 30; done']
