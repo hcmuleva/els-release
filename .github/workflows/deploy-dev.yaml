@@ -40,18 +40,18 @@ jobs:
         with:
           context: fullstack_level3/development/server
           push: true
-          tags: harishdell/elsapi:${{ env.VERSION }}:${{ github.run_number }}
+          tags: harishdell/elsapi:${{ env.VERSION }}-${{ github.run_number }}
 
       - name: Update Helm values
         run: |
           cd fullstack_level3/devops/helm
           # Update the tag in values.yaml
-          sed -i "s/tag: .*/tag: \"${{ env.VERSION }}:${{ github.run_number }}\"/" values.yaml
+          sed -i "s/tag: .*/tag: \"${{ env.VERSION }}-${{ github.run_number }}\"/" values.yaml
           
       - name: Commit and Push changes
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add fullstack_level3/devops/helm/values.yaml
-          git commit -m "chore: update image tag to ${{ env.VERSION }}:${{ github.run_number }} [skip ci]"
+          git commit -m "chore: update image tag to ${{ env.VERSION }}-${{ github.run_number }} [skip ci]"
           git push
