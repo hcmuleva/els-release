@@ -18,14 +18,13 @@ spec:
       - name: env.NODE_ENV
         value: development
       - name: ingress.hosts[0].host
-        value: dev.els-api.local
+        value: project: dev
   destination:
     server: https://kubernetes.default.svc
-    namespace: server-dev
+    namespace: dev
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
       

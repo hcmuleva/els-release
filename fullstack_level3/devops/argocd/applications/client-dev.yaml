@@ -4,10 +4,10 @@ metadata:
   name: client-dev
   namespace: argocd
 spec:
-  project: client-dev
+  project: dev
   destination:
     server: https://kubernetes.default.svc
-    namespace: client-dev
+    namespace: dev
   source:
     repoURL: https://github.com/hcmuleva/els-release.git
     targetRevision: dev

@@ -4,10 +4,10 @@ metadata:
   name: client-prod
   namespace: argocd
 spec:
-  project: client-prod
+  project: prod
   destination:
     server: https://kubernetes.default.svc
-    namespace: client-prod
+    namespace: prod
   source:
     repoURL: https://github.com/hcmuleva/els-release.git
     targetRevision: main

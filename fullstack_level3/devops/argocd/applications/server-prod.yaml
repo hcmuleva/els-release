@@ -21,7 +21,7 @@ spec:
         value: prod.els-api.local
   destination:
     server: https://kubernetes.default.svc
-    namespace: server-prod
+    namespace: prod
   syncPolicy:
     automated:
       prune: true
