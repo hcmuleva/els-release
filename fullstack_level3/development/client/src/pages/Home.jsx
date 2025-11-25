@@ -83,7 +83,7 @@ function Home() {
     <div className="home">
       {/* Hero Section */}
       <Hero
-        title="Welcome to College Kit"
+        title="Welcome to College Kit Demo modified"
         subtitle="Connect with students, explore opportunities, and build your college network"
       />
 
